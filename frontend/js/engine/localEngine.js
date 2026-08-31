@@ -40,11 +40,12 @@ function tokenize(source) {
     if (/\s/.test(c)) { i++; continue; }
 
     if (isDigit(c) || c === '.') {
-      let start = i, sawDot = false, sawDigit = false;
+      let start = i, dotCount = 0, sawDigit = false;
       while (i < source.length && (isDigit(source[i]) || source[i] === '.')) {
-        if (source[i] === '.') { if (sawDot) break; sawDot = true; } else sawDigit = true;
+        if (source[i] === '.') dotCount++; else sawDigit = true;
         i++;
       }
+      if (dotCount > 1) throw new EngineError('SYNTAX_ERROR', `Malformed number at position ${start}`);
       if (!sawDigit) throw new EngineError('SYNTAX_ERROR', `Malformed number at position ${start}`);
       if (i < source.length && (source[i] === 'e' || source[i] === 'E')) {
         let look = i + 1;
@@ -161,7 +162,7 @@ function primary(ts) {
   if (ts.check('IDENTIFIER')) {
     const t = ts.advance();
     const name = t.text;
-    if (ts.check('LPAREN') && isKnownFunction(name.toLowerCase())) {
+    if (ts.check('LPAREN')) {
       ts.advance();
       const args = [];
       if (!ts.check('RPAREN')) {
@@ -306,9 +307,21 @@ function evalNode(node, ctx) {
     }
     case 'Call': {
       const args = node.args.map((a) => evalNode(a, ctx));
-      const result = callFunction(node.name, args, ctx.angleMode);
-      ctx.trail.push(step(`Apply ${node.name}()`, `${node.name}(${args.map(formatNumber).join(', ')})`, result));
-      return result;
+      const nameLower = node.name.toLowerCase();
+      if (isKnownFunction(nameLower)) {
+        const result = callFunction(nameLower, args, ctx.angleMode);
+        ctx.trail.push(step(`Apply ${node.name}()`, `${node.name}(${args.map(formatNumber).join(', ')})`, result));
+        return result;
+      }
+      if (args.length === 1) {
+        if (nameLower in CONSTANTS || nameLower in ctx.variables) {
+          const varValue = nameLower in CONSTANTS ? CONSTANTS[nameLower] : ctx.variables[nameLower];
+          const result = varValue * args[0];
+          ctx.trail.push(step('Multiply (implicit)', `${node.name}(${formatNumber(args[0])})`, result));
+          return result;
+        }
+      }
+      throw new EngineError('UNKNOWN_FUNCTION', `Unknown function '${node.name}'`);
     }
     case 'Binary': {
       const left = evalNode(node.left, ctx);

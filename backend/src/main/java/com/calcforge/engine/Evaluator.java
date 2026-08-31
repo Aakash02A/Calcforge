@@ -63,11 +63,27 @@ public final class Evaluator {
             for (Expr a : e.getArgs()) {
                 args.add(eval(a, ctx));
             }
-            BigDecimal result = MathFunctions.apply(e.getName(), args, ctx);
-            String rendered = e.getName() + "(" +
-                    args.stream().map(NumberFormatter::plain).collect(Collectors.joining(", ")) + ")";
-            recordStep(ctx, "Apply " + e.getName() + "()", rendered, result);
-            return result;
+            if (MathFunctions.isKnownFunction(e.getName())) {
+                BigDecimal result = MathFunctions.apply(e.getName(), args, ctx);
+                String rendered = e.getName() + "(" +
+                        args.stream().map(NumberFormatter::plain).collect(Collectors.joining(", ")) + ")";
+                recordStep(ctx, "Apply " + e.getName() + "()", rendered, result);
+                return result;
+            }
+            // Fallback for implicit multiplication when using a variable/constant name as a function:
+            // e.g. x(2+3) -> x * (2+3)
+            if (args.size() == 1) {
+                String name = e.getName();
+                boolean isVar = ctx.lookupVariable(name) != null;
+                boolean isConst = MathConstants.resolve(name, ctx.getMathContext()) != null;
+                if (isVar || isConst) {
+                    BigDecimal varValue = resolveVariable(name, ctx);
+                    BigDecimal result = varValue.multiply(args.get(0), ctx.getMathContext());
+                    recordStep(ctx, "Multiply (implicit)", name + "(" + NumberFormatter.plain(args.get(0)) + ")", result);
+                    return result;
+                }
+            }
+            throw new ExpressionException(ErrorCode.UNKNOWN_FUNCTION, "Unknown function '" + e.getName() + "'");
         }
         if (expr instanceof BinaryExpr e) {
             BigDecimal left = eval(e.getLeft(), ctx);

@@ -94,17 +94,21 @@ public class Lexer {
 
     private Token readNumber() {
         int start = pos;
-        boolean sawDot = false;
+        int dotCount = 0;
         boolean sawDigit = false;
 
         while (!isAtEnd() && (Character.isDigit(peek()) || peek() == '.')) {
             if (peek() == '.') {
-                if (sawDot) break;
-                sawDot = true;
+                dotCount++;
             } else {
                 sawDigit = true;
             }
             advance();
+        }
+
+        if (dotCount > 1) {
+            throw new ExpressionException(ErrorCode.SYNTAX_ERROR,
+                    "Malformed number with multiple decimal points at position " + start);
         }
 
         if (!sawDigit) {

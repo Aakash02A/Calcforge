@@ -146,7 +146,7 @@ public class Parser {
             Token t = advance();
             String name = t.getText();
             boolean nextIsParen = check(TokenType.LPAREN);
-            if (nextIsParen && MathFunctions.isKnownFunction(name.toLowerCase())) {
+            if (nextIsParen) {
                 advance(); // consume '('
                 List<Expr> args = new ArrayList<>();
                 if (!check(TokenType.RPAREN)) {

@@ -46,6 +46,9 @@ public final class ExprUtils {
             return;
         }
         if (expr instanceof FunctionCallExpr e) {
+            if (!MathFunctions.isKnownFunction(e.getName())) {
+                out.add(e.getName());
+            }
             e.getArgs().forEach(a -> collect(a, out));
             return;
         }
