@@ -36,7 +36,6 @@ public class HistoryEntry {
     @Column(length = 255)
     private String result;
 
-    @Lob
     @Column(name = "trail_json", columnDefinition = "JSON")
     private String trailJson;
 

@@ -34,7 +34,6 @@ public class Calculation {
     private String result;
 
     /** Serialized {@code CalculationTrail} JSON - see docs/CALCULATION_TRAIL.md. */
-    @Lob
     @Column(name = "trail_json", columnDefinition = "JSON")
     private String trailJson;
 

@@ -31,7 +31,6 @@ public class Scenario {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Lob
     @Column(name = "variables_json", nullable = false, columnDefinition = "JSON")
     private String variablesJson;
 
