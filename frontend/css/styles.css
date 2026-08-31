@@ -22,8 +22,8 @@
   --cf-border: #343b47;
   --cf-border-soft: #262b35;
   --cf-text: #e9ebef;
-  --cf-text-dim: #9aa1ac;
-  --cf-text-faint: #6b7280;
+  --cf-text-dim: #a9b1bc;
+  --cf-text-faint: #7c8491;
 
   --cf-accent: #e8743b;          /* forge copper - primary actions */
   --cf-accent-hover: #f2895899;
@@ -140,7 +140,7 @@ body {
   height: 52px;
   border: none;
   background: transparent;
-  color: var(--cf-text-dim);
+  color: var(--cf-text-dim) !important;
   border-radius: var(--cf-radius-sm);
   display: flex;
   flex-direction: column;
@@ -486,21 +486,38 @@ body {
 .cf-scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
 .cf-scroll-thin::-webkit-scrollbar-thumb { background: var(--cf-border); border-radius: 4px; }
 
-.cf-muted { color: var(--cf-text-dim); }
-.cf-faint { color: var(--cf-text-faint); }
+.cf-muted { color: var(--cf-text-dim) !important; }
+.cf-faint { color: var(--cf-text-faint) !important; }
+
+.input-group-text {
+  background-color: var(--cf-surface-3) !important;
+  border-color: var(--cf-border) !important;
+  color: var(--cf-text-dim) !important;
+}
+
+.form-control::placeholder {
+  color: var(--cf-text-dim) !important;
+  opacity: 0.65 !important;
+}
+
+.cf-table-clean {
+  background: transparent !important;
+}
 
 .cf-table-clean thead th {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--cf-text-faint);
-  border-bottom: 1px solid var(--cf-border);
+  color: var(--cf-text-faint) !important;
+  border-bottom: 1px solid var(--cf-border) !important;
   font-weight: 700;
+  background: transparent !important;
 }
 
 .cf-table-clean td, .cf-table-clean th {
-  border-color: var(--cf-border-soft);
-  color: var(--cf-text);
+  background: transparent !important;
+  border-color: var(--cf-border-soft) !important;
+  color: var(--cf-text) !important;
   vertical-align: middle;
 }
 
@@ -545,15 +562,15 @@ body {
 }
 
 input.form-control, select.form-select, textarea.form-control {
-  background: var(--cf-surface-2);
-  border-color: var(--cf-border);
-  color: var(--cf-text);
+  background: var(--cf-surface-2) !important;
+  border-color: var(--cf-border) !important;
+  color: var(--cf-text) !important;
 }
 input.form-control:focus, select.form-select:focus, textarea.form-control:focus {
-  background: var(--cf-surface-2);
-  color: var(--cf-text);
-  border-color: var(--cf-accent);
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--cf-accent) 25%, transparent);
+  background: var(--cf-surface-2) !important;
+  color: var(--cf-text) !important;
+  border-color: var(--cf-accent) !important;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--cf-accent) 25%, transparent) !important;
 }
 
 .cf-empty-state {
