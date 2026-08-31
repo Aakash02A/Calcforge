@@ -4,7 +4,7 @@ import { initCalculatorView } from './views/calculator.js';
 import { initWorkspaceView, loadWorkspaces, refreshWorkspaceCanvas } from './views/workspace.js';
 import { initVariablesView, refreshVariablesView } from './views/variables.js';
 import { initHistoryView, refreshHistoryView } from './views/history.js';
-import { initGraphView } from './views/graph.js';
+import { initGraphView, refreshGraphView } from './views/graph.js';
 import { initSettingsView } from './views/settings.js';
 
 const VIEW_TITLES = {
@@ -24,6 +24,7 @@ function switchView(name) {
   if (name === 'workspace') refreshWorkspaceCanvas();
   if (name === 'variables') refreshVariablesView();
   if (name === 'history') refreshHistoryView();
+  if (name === 'graph') refreshGraphView();
 }
 
 function initNav() {
@@ -36,6 +37,7 @@ function initThemeToggle() {
   document.documentElement.setAttribute('data-theme', state.theme);
   document.getElementById('theme-toggle').addEventListener('click', () => {
     setTheme(state.theme === 'dark' ? 'light' : 'dark');
+    refreshGraphView();
   });
 }
 

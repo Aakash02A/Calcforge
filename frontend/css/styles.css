@@ -580,10 +580,18 @@ input.form-control:focus, select.form-select:focus, textarea.form-control:focus 
 }
 
 .cf-graph-canvas-wrap {
-  background: var(--cf-display-bg);
+  background: var(--cf-surface);
   border: 1px solid var(--cf-border);
   border-radius: var(--cf-radius);
   padding: 10px;
+  box-shadow: var(--cf-shadow);
+  overflow: hidden;
+}
+
+#graph-canvas {
+  display: block;
+  border-radius: var(--cf-radius-sm);
+  cursor: crosshair;
 }
 
 @media (max-width: 640px) {

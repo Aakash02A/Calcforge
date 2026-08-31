@@ -2,6 +2,7 @@ import { state, setAngleMode, setPrecision, setApiBase, setTheme, setAuth, clear
 import { CloudApi, checkHealth } from '../api.js';
 import { toast } from '../utils.js';
 import { updateAssumptionChips } from './calculator.js';
+import { refreshGraphView } from './graph.js';
 
 function applyThemeButtons() {
   document.getElementById('theme-dark-btn').classList.toggle('btn-cf-accent', state.theme === 'dark');
@@ -109,8 +110,8 @@ export function initSettingsView() {
     updateAssumptionChips();
   });
 
-  document.getElementById('theme-dark-btn').addEventListener('click', () => { setTheme('dark'); applyThemeButtons(); });
-  document.getElementById('theme-light-btn').addEventListener('click', () => { setTheme('light'); applyThemeButtons(); });
+  document.getElementById('theme-dark-btn').addEventListener('click', () => { setTheme('dark'); applyThemeButtons(); refreshGraphView(); });
+  document.getElementById('theme-light-btn').addEventListener('click', () => { setTheme('light'); applyThemeButtons(); refreshGraphView(); });
 
   document.getElementById('save-api-base-btn').addEventListener('click', async () => {
     setApiBase(document.getElementById('setting-api-base').value.trim().replace(/\/$/, ''));
