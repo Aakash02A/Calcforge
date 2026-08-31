@@ -1,0 +1,25 @@
+# "local" profile (default): a single-user, offline-first installation. Cloud features
+# are off by default here - flip them on individually with the env vars below if desired,
+# but nothing in the MVP requires it.
+
+spring:
+  datasource:
+    url: "jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:calcforge}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true"
+    username: "${DB_USERNAME:calcforge}"
+    password: "${DB_PASSWORD:calcforge}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 10000
+
+calcforge:
+  cloud:
+    sync-enabled: false
+    ai-assist-enabled: false
+    live-currency-enabled: false
+    shared-workspaces-enabled: false
+    analytics-enabled: false
+
+logging:
+  level:
+    com.calcforge: DEBUG

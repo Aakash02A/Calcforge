@@ -1,0 +1,27 @@
+# "cloud" profile: same core application, deployed with the optional layer switched on.
+# Every core calculation feature behaves identically to the "local" profile - this only
+# changes defaults for accounts, sync, AI assistance, live currency and sharing.
+
+spring:
+  datasource:
+    url: "jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:calcforge}?useSSL=true&allowPublicKeyRetrieval=false&serverTimezone=UTC"
+    username: root
+    password: "0212
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 10000
+
+calcforge:
+  cors:
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:https://app.example.com}"
+  cloud:
+    sync-enabled: true
+    ai-assist-enabled: "${AI_ASSIST_ENABLED:false}" # still requires ANTHROPIC_API_KEY to actually work
+    live-currency-enabled: "${LIVE_CURRENCY_ENABLED:false}" # still requires a rate provider - see CurrencyRateService
+    shared-workspaces-enabled: true
+    analytics-enabled: false # opt-in only, per user - never flip this default to true
+
+logging:
+  level:
+    com.calcforge: INFO

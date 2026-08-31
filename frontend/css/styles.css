@@ -1,0 +1,576 @@
+/* =====================================================================================
+   CalcForge design system
+   -------------------------------------------------------------------------------------
+   Visual identity: a precision instrument, not a marketing surface. The metaphor is a
+   engineer's logbook crossed with a real calculator's LCD readout - monospace numerals,
+   a "forge" copper accent for primary actions, a cool signal teal for secondary/graph
+   content, and a stepped ledger rule down the side of the calculation trail.
+
+   Deliberately uses only system font stacks (no @font-face / Google Fonts): this is a
+   local-first, offline-first product, and the UI must never depend on the network just
+   to render text. Bootstrap 5 (vendored locally, see vendor/bootstrap) supplies layout
+   primitives and components; everything visual is redefined here via CSS custom
+   properties layered on top of it.
+   ===================================================================================== */
+
+:root,
+[data-theme="dark"] {
+  --cf-bg: #14171c;
+  --cf-surface: #1c2029;
+  --cf-surface-2: #242933;
+  --cf-surface-3: #2c313c;
+  --cf-border: #343b47;
+  --cf-border-soft: #262b35;
+  --cf-text: #e9ebef;
+  --cf-text-dim: #9aa1ac;
+  --cf-text-faint: #6b7280;
+
+  --cf-accent: #e8743b;          /* forge copper - primary actions */
+  --cf-accent-hover: #f2895899;
+  --cf-accent-strong: #ff8a4c;
+  --cf-signal: #45c4b0;          /* teal - secondary / graph / links */
+  --cf-signal-strong: #5fe0cb;
+  --cf-success: #3dd68c;
+  --cf-danger: #e5484d;
+  --cf-warning: #e8b73b;
+
+  --cf-display-bg: #10130f;
+  --cf-display-text: #f4c77b;
+  --cf-display-text-dim: #b98f52;
+
+  --cf-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --cf-radius: 10px;
+  --cf-radius-sm: 6px;
+
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --cf-bg: #f3f1ea;
+  --cf-surface: #ffffff;
+  --cf-surface-2: #f7f5ee;
+  --cf-surface-3: #efece1;
+  --cf-border: #ddd7c6;
+  --cf-border-soft: #e8e4d6;
+  --cf-text: #1f2328;
+  --cf-text-dim: #5b6270;
+  --cf-text-faint: #8b8f97;
+
+  --cf-accent: #c1571e;
+  --cf-accent-hover: #c1571e22;
+  --cf-accent-strong: #a8481a;
+  --cf-signal: #1a7f6f;
+  --cf-signal-strong: #14655a;
+  --cf-success: #1f9d5c;
+  --cf-danger: #c53338;
+  --cf-warning: #a6790f;
+
+  --cf-display-bg: #fbf6ea;
+  --cf-display-text: #7a4a12;
+  --cf-display-text-dim: #a97c3f;
+
+  --cf-shadow: 0 8px 20px rgba(60, 50, 30, 0.12);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--cf-bg);
+  color: var(--cf-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Roboto Mono", "Cascadia Code", monospace;
+}
+
+/* ------------------------------------------------------------------- app shell / nav */
+
+.cf-app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.cf-sidebar {
+  width: 76px;
+  background: var(--cf-surface);
+  border-right: 1px solid var(--cf-border-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0;
+  flex-shrink: 0;
+}
+
+.cf-brand {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--cf-radius-sm);
+  background: linear-gradient(155deg, var(--cf-accent), #a8481a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 22px;
+  letter-spacing: -0.5px;
+  box-shadow: var(--cf-shadow);
+  user-select: none;
+}
+
+.cf-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: center;
+}
+
+.cf-nav-btn {
+  width: 56px;
+  height: 52px;
+  border: none;
+  background: transparent;
+  color: var(--cf-text-dim);
+  border-radius: var(--cf-radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.cf-nav-btn svg { width: 20px; height: 20px; }
+
+.cf-nav-btn:hover {
+  background: var(--cf-surface-2);
+  color: var(--cf-text);
+}
+
+.cf-nav-btn.active {
+  background: var(--cf-surface-3);
+  color: var(--cf-accent-strong);
+}
+
+.cf-nav-spacer { flex: 1; }
+
+.cf-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cf-topbar {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--cf-border-soft);
+  background: var(--cf-surface);
+}
+
+.cf-topbar h1 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--cf-text);
+}
+
+.cf-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--cf-border);
+  color: var(--cf-text-dim);
+}
+
+.cf-status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--cf-success);
+}
+
+.cf-status-pill.offline .cf-status-dot { background: var(--cf-warning); }
+.cf-status-pill.offline { color: var(--cf-warning); border-color: color-mix(in srgb, var(--cf-warning) 40%, var(--cf-border)); }
+
+.cf-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.cf-view { display: none; }
+.cf-view.active { display: block; }
+
+/* ------------------------------------------------------------------- calculator */
+
+.cf-calc-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 460px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .cf-calc-layout { grid-template-columns: 1fr; }
+}
+
+.cf-display-panel {
+  background: var(--cf-display-bg);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  padding: 18px 18px 14px;
+  box-shadow: var(--cf-shadow);
+}
+
+.cf-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cf-expr-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--cf-display-text);
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 6px 0;
+}
+
+.cf-expr-input::placeholder { color: var(--cf-display-text-dim); opacity: 0.7; }
+
+.cf-result-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 2.4rem;
+  border-top: 1px dashed color-mix(in srgb, var(--cf-display-text-dim) 35%, transparent);
+  margin-top: 6px;
+  padding-top: 8px;
+}
+
+.cf-result-value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: var(--cf-display-text);
+  word-break: break-all;
+  text-align: right;
+}
+
+.cf-result-error {
+  color: var(--cf-danger);
+  font-size: 0.95rem;
+}
+
+.cf-assump-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.cf-chip {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--cf-surface-3);
+  color: var(--cf-text-dim);
+  border: 1px solid var(--cf-border);
+}
+
+/* keypad */
+
+.cf-keypad {
+  margin-top: 14px;
+}
+
+.cf-key {
+  border: 1px solid var(--cf-border);
+  background: var(--cf-surface-2);
+  color: var(--cf-text);
+  border-radius: var(--cf-radius-sm);
+  padding: 10px 0;
+  font-size: 0.92rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+  transition: background-color 0.1s ease, transform 0.05s ease;
+}
+
+.cf-key:hover { background: var(--cf-surface-3); }
+.cf-key:active { transform: scale(0.96); }
+.cf-key.cf-key-op { color: var(--cf-signal-strong); }
+.cf-key.cf-key-accent { background: var(--cf-accent); color: #fff; border-color: transparent; }
+.cf-key.cf-key-accent:hover { background: var(--cf-accent-strong); }
+.cf-key.cf-key-wide { grid-column: span 2; }
+
+.cf-keypad-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 14px;
+  border-bottom: 1px solid var(--cf-border-soft);
+}
+
+.cf-keypad-tab {
+  background: none;
+  border: none;
+  color: var(--cf-text-dim);
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.cf-keypad-tab.active {
+  color: var(--cf-accent-strong);
+  border-bottom-color: var(--cf-accent);
+}
+
+.cf-keypad-page {
+  display: none;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.cf-keypad-page.active { display: grid; }
+
+/* ------------------------------------------------------------------- trail ledger */
+
+.cf-trail-panel {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border-soft);
+  border-radius: var(--cf-radius);
+  padding: 18px 18px 18px 0;
+}
+
+.cf-trail-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cf-text-faint);
+  font-weight: 700;
+  margin: 0 0 12px 18px;
+}
+
+.cf-ledger {
+  position: relative;
+  padding-left: 34px;
+}
+
+.cf-ledger::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--cf-border);
+}
+
+.cf-ledger-stage {
+  margin-bottom: 14px;
+}
+
+.cf-ledger-stage-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--cf-accent-strong);
+  font-weight: 700;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.cf-ledger-stage-label::before {
+  content: "";
+  position: absolute;
+  left: -21px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cf-accent);
+}
+
+.cf-ledger-step {
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--cf-surface-2);
+  border-radius: var(--cf-radius-sm);
+  border: 1px solid var(--cf-border-soft);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cf-ledger-step .cf-step-title { color: var(--cf-text-dim); font-size: 0.72rem; flex-basis: 100%; }
+.cf-ledger-step .cf-step-expr { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--cf-text); }
+.cf-ledger-step .cf-step-value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--cf-signal-strong); font-weight: 600; }
+.cf-ledger-step.result { background: color-mix(in srgb, var(--cf-accent) 12%, var(--cf-surface-2)); border-color: color-mix(in srgb, var(--cf-accent) 35%, var(--cf-border)); }
+.cf-ledger-step.result .cf-step-value { color: var(--cf-accent-strong); font-size: 1rem; }
+
+.cf-ledger-empty {
+  color: var(--cf-text-faint);
+  font-size: 0.85rem;
+  padding: 10px 0;
+}
+
+/* ------------------------------------------------------------------- cards / workspace canvas */
+
+.cf-card {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border-soft);
+  border-radius: var(--cf-radius);
+  padding: 16px;
+  box-shadow: var(--cf-shadow);
+}
+
+.cf-canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.cf-calc-card {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border-soft);
+  border-radius: var(--cf-radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cf-calc-card .cf-card-expr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--cf-text-dim);
+  font-size: 0.82rem;
+  word-break: break-word;
+}
+
+.cf-calc-card .cf-card-result {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--cf-accent-strong);
+  font-size: 1.3rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+/* ------------------------------------------------------------------- misc */
+
+.cf-scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.cf-scroll-thin::-webkit-scrollbar-thumb { background: var(--cf-border); border-radius: 4px; }
+
+.cf-muted { color: var(--cf-text-dim); }
+.cf-faint { color: var(--cf-text-faint); }
+
+.cf-table-clean thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cf-text-faint);
+  border-bottom: 1px solid var(--cf-border);
+  font-weight: 700;
+}
+
+.cf-table-clean td, .cf-table-clean th {
+  border-color: var(--cf-border-soft);
+  color: var(--cf-text);
+  vertical-align: middle;
+}
+
+.cf-badge-unit {
+  font-size: 0.68rem;
+  background: var(--cf-surface-3);
+  color: var(--cf-signal-strong);
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid var(--cf-border);
+}
+
+.btn-cf-accent {
+  background: var(--cf-accent);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-cf-accent:hover { background: var(--cf-accent-strong); color: #fff; }
+
+.btn-cf-ghost {
+  background: transparent;
+  border: 1px solid var(--cf-border);
+  color: var(--cf-text);
+}
+.btn-cf-ghost:hover { background: var(--cf-surface-2); color: var(--cf-text); }
+
+.cf-toast-stack {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 340px;
+}
+
+.cf-modal-content {
+  background: var(--cf-surface);
+  color: var(--cf-text);
+  border: 1px solid var(--cf-border);
+}
+
+input.form-control, select.form-select, textarea.form-control {
+  background: var(--cf-surface-2);
+  border-color: var(--cf-border);
+  color: var(--cf-text);
+}
+input.form-control:focus, select.form-select:focus, textarea.form-control:focus {
+  background: var(--cf-surface-2);
+  color: var(--cf-text);
+  border-color: var(--cf-accent);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--cf-accent) 25%, transparent);
+}
+
+.cf-empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--cf-text-faint);
+}
+
+.cf-graph-canvas-wrap {
+  background: var(--cf-display-bg);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  padding: 10px;
+}
+
+@media (max-width: 640px) {
+  .cf-sidebar { width: 64px; }
+  .cf-nav-btn { width: 48px; }
+  .cf-content { padding: 14px; }
+}

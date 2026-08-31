@@ -1,0 +1,80 @@
+# CalcForge backend - base configuration shared by every profile.
+# Profile-specific overrides live in application-local.yml and application-cloud.yml.
+# Select a profile with: --spring.profiles.active=local (default) or =cloud
+# or the SPRING_PROFILES_ACTIVE environment variable.
+
+spring:
+  application:
+    name: calcforge-backend
+  profiles:
+    active: local
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway (below) is the single source of truth for the schema. "none" means Hibernate
+      # never tries to create or validate DDL itself - see docs/CALCULATION_TRAIL.md and the
+      # README for why this project intentionally does not use ddl-auto: update/validate.
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+calcforge:
+  cors:
+    # Comma-separated list of allowed origins, e.g. "http://localhost:5500,https://myapp.com".
+    # "*" (the default) is fine for local development and for the local-first single-user
+    # deployment this project targets; tighten it for any multi-tenant cloud deployment.
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:*}"
+
+  security:
+    jwt:
+      # MUST be overridden (env var CALCFORGE_JWT_SECRET) with a long random value in any
+      # real deployment. Only used by the optional cloud auth endpoints.
+      secret: "${CALCFORGE_JWT_SECRET:dev-only-change-this-to-a-long-random-secret-before-deploying-1234567890}"
+      access-token-ttl-minutes: 15
+
+  cloud:
+    sync-enabled: true
+    ai-assist-enabled: "${AI_ASSIST_ENABLED:false}"
+    live-currency-enabled: "${LIVE_CURRENCY_ENABLED:false}"
+    shared-workspaces-enabled: "${SHARED_WORKSPACES_ENABLED:false}"
+    analytics-enabled: false
+    ai:
+      anthropic-api-key: "${ANTHROPIC_API_KEY:}"
+      model: "${CALCFORGE_AI_MODEL:claude-sonnet-4-5}"
+    currency:
+      refresh-cron: "0 0 * * * *" # hourly; no-op unless live-currency-enabled is true
+
+logging:
+  level:
+    root: INFO
+    com.calcforge: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
