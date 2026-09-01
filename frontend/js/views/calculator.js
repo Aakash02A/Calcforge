@@ -93,8 +93,74 @@ function clearBoardHighlight() {
   }
 }
 
+let currentCompiledCode = {
+  java: '',
+  python: '',
+  rust: ''
+};
+
+async function updateCodeExport(expr) {
+  const drawer = document.getElementById('code-export-drawer');
+  if (!drawer || !expr || !expr.trim()) {
+    if (drawer) drawer.classList.add('d-none');
+    return;
+  }
+  drawer.classList.remove('d-none');
+
+  if (state.online) {
+    try {
+      const res = await LocalApi.compile(expr);
+      currentCompiledCode = {
+        java: res.java || '',
+        python: res.python || '',
+        rust: res.rust || ''
+      };
+      const jEl = document.getElementById('code-output-java');
+      const pEl = document.getElementById('code-output-python');
+      const rEl = document.getElementById('code-output-rust');
+      if (jEl) jEl.textContent = currentCompiledCode.java;
+      if (pEl) pEl.textContent = currentCompiledCode.python;
+      if (rEl) rEl.textContent = currentCompiledCode.rust;
+    } catch {
+      const jEl = document.getElementById('code-output-java');
+      const pEl = document.getElementById('code-output-python');
+      const rEl = document.getElementById('code-output-rust');
+      if (jEl) jEl.textContent = '// Connect to backend for full formula compilation';
+      if (pEl) pEl.textContent = '# Connect to backend for full formula compilation';
+      if (rEl) rEl.textContent = '// Connect to backend for full formula compilation';
+    }
+  }
+}
+
+function initCopyCode() {
+  const copyBtn = document.getElementById('copy-code-btn');
+  if (!copyBtn) return;
+  copyBtn.addEventListener('click', async () => {
+    const activeTab = document.querySelector('#code-export-tabs .nav-link.active');
+    const lang = activeTab ? activeTab.id.replace('tab-', '') : 'java';
+    const code = currentCompiledCode[lang] || '';
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      const label = document.getElementById('copy-code-label');
+      if (label) label.textContent = 'Copied!';
+      copyBtn.classList.add('btn-success');
+      copyBtn.classList.remove('btn-outline-secondary');
+      setTimeout(() => {
+        if (label) label.textContent = 'Copy Code';
+        copyBtn.classList.remove('btn-success');
+        copyBtn.classList.add('btn-outline-secondary');
+      }, 1800);
+    } catch (e) {
+      toast('Failed to copy to clipboard', 'error');
+    }
+  });
+}
+
 function renderEmpty() {
   clearBoardHighlight();
+  const drawer = document.getElementById('code-export-drawer');
+  if (drawer) drawer.classList.add('d-none');
   resultDisplay().textContent = '\u00a0';
   resultDisplay().classList.remove('cf-result-error');
   trailLedger().innerHTML = '<p class="cf-ledger-empty">Enter an expression to see the input, assumptions, formula, computation and result laid out step by step.</p>';
@@ -102,6 +168,8 @@ function renderEmpty() {
 
 function renderError(message) {
   clearBoardHighlight();
+  const drawer = document.getElementById('code-export-drawer');
+  if (drawer) drawer.classList.add('d-none');
   resultDisplay().textContent = message;
   resultDisplay().classList.add('cf-result-error');
   trailLedger().innerHTML = `<p class="cf-ledger-empty">${escapeHtml(message)}</p>`;
@@ -112,6 +180,8 @@ function renderDimensionalError(err) {
   if (displayPanel) {
     displayPanel.classList.add('border', 'border-danger', 'border-2');
   }
+  const drawer = document.getElementById('code-export-drawer');
+  if (drawer) drawer.classList.add('d-none');
   resultDisplay().textContent = 'Dimension Error';
   resultDisplay().classList.add('cf-result-error');
 
@@ -134,11 +204,12 @@ function renderDimensionalError(err) {
   `;
 }
 
-function renderResult(displayValue, trail) {
+function renderResult(displayValue, trail, expression) {
   clearBoardHighlight();
   resultDisplay().classList.remove('cf-result-error');
   resultDisplay().textContent = displayValue;
   renderTrail(trailLedger(), trail);
+  updateCodeExport(expression);
 }
 
 async function evaluateNow(expression, { save }) {
@@ -157,7 +228,7 @@ async function evaluateNow(expression, { save }) {
     try {
       const res = await LocalApi.calculate(payload);
       lastGoodResult = { value: res.resultPlain, display: res.resultDisplay };
-      renderResult(res.resultDisplay, res.trail);
+      renderResult(res.resultDisplay, res.trail, expression);
       return;
     } catch (err) {
       if (err.status === 0) {
@@ -180,7 +251,7 @@ async function evaluateNow(expression, { save }) {
     });
     const display = trail.steps[trail.steps.length - 1].value;
     lastGoodResult = { value: String(result), display };
-    renderResult(display, trail);
+    renderResult(display, trail, expression);
     if (save) {
       await queueOfflineCalculation({ expression, result: display, trailJson: JSON.stringify(trail) });
     }
@@ -231,6 +302,7 @@ export function setExpression(expr) {
 export function initCalculatorView() {
   buildKeypad();
   updateAssumptionChips();
+  initCopyCode();
 
   document.querySelectorAll('.cf-keypad-tab').forEach((tab) => {
     tab.addEventListener('click', () => {

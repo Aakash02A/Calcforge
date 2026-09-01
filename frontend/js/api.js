@@ -78,6 +78,7 @@ export async function checkHealth() {
 
 export const LocalApi = {
   calculate: (payload) => request('POST', '/api/v1/local/calculate', payload),
+  compile: (expression) => request('POST', '/api/v1/local/calculate/compile', { expression }),
   validate: (expression) => request('POST', '/api/v1/local/calculate/validate', { expression }),
 
   listWorkspaces: () => request('GET', '/api/v1/local/workspaces'),

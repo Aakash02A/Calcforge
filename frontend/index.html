@@ -91,8 +91,39 @@
 
           <div class="cf-trail-panel">
             <p class="cf-trail-title">Calculation trail</p>
-            <div class="cf-ledger cf-scroll-thin" id="trail-ledger" style="max-height: 60vh; overflow-y:auto;">
+            <div class="cf-ledger cf-scroll-thin" id="trail-ledger" style="max-height: 40vh; overflow-y:auto;">
               <p class="cf-ledger-empty">Enter an expression to see the input, assumptions, formula, computation and result laid out step by step.</p>
+            </div>
+
+            <div class="cf-code-export-drawer mt-3 d-none" id="code-export-drawer">
+              <div class="d-flex align-items-center justify-content-between p-2 border-bottom border-secondary-subtle">
+                <ul class="nav nav-pills gap-1" id="code-export-tabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active py-1 px-2.5 small" id="tab-java" data-bs-toggle="tab" data-bs-target="#pane-java" type="button" role="tab">Java (BigDecimal)</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link py-1 px-2.5 small" id="tab-python" data-bs-toggle="tab" data-bs-target="#pane-python" type="button" role="tab">Python (Decimal)</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link py-1 px-2.5 small" id="tab-rust" data-bs-toggle="tab" data-bs-target="#pane-rust" type="button" role="tab">Rust (ibig)</button>
+                  </li>
+                </ul>
+                <button class="btn btn-sm btn-outline-secondary py-0.5 px-2 small d-flex align-items-center gap-1" id="copy-code-btn" type="button" title="Copy code to clipboard">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span id="copy-code-label">Copy Code</span>
+                </button>
+              </div>
+              <div class="tab-content" id="code-export-panes">
+                <div class="tab-pane fade show active p-2" id="pane-java" role="tabpanel">
+                  <pre class="font-mono mb-0"><code id="code-output-java">// Generating Java code...</code></pre>
+                </div>
+                <div class="tab-pane fade p-2" id="pane-python" role="tabpanel">
+                  <pre class="font-mono mb-0"><code id="code-output-python"># Generating Python code...</code></pre>
+                </div>
+                <div class="tab-pane fade p-2" id="pane-rust" role="tabpanel">
+                  <pre class="font-mono mb-0"><code id="code-output-rust">// Generating Rust code...</code></pre>
+                </div>
+              </div>
             </div>
           </div>
         </div>

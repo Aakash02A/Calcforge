@@ -599,3 +599,42 @@ input.form-control:focus, select.form-select:focus, textarea.form-control:focus 
   .cf-nav-btn { width: 48px; }
   .cf-content { padding: 14px; }
 }
+
+.cf-code-export-drawer {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  overflow: hidden;
+  box-shadow: var(--cf-shadow);
+}
+
+.cf-code-export-drawer .nav-link {
+  color: var(--cf-text-dim);
+  border-radius: var(--cf-radius-sm);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  transition: all 0.15s ease;
+}
+
+.cf-code-export-drawer .nav-link.active {
+  background: var(--cf-accent) !important;
+  color: #fff !important;
+}
+
+.cf-code-export-drawer pre {
+  background: var(--cf-surface-2);
+  color: var(--cf-text);
+  padding: 10px 12px;
+  border-radius: var(--cf-radius-sm);
+  border: 1px solid var(--cf-border-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cf-code-export-drawer pre code {
+  color: inherit;
+}
