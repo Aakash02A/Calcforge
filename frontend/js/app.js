@@ -4,7 +4,7 @@ import { initCalculatorView } from './views/calculator.js';
 import { initWorkspaceView, loadWorkspaces, refreshWorkspaceCanvas } from './views/workspace.js';
 import { initVariablesView, refreshVariablesView } from './views/variables.js';
 import { initHistoryView, refreshHistoryView } from './views/history.js';
-import { initGraphView, refreshGraphView } from './views/graph.js';
+import { initGraphView, refreshGraphView } from './views/graph.js?v=2.2';
 import { initSettingsView } from './views/settings.js';
 
 const VIEW_TITLES = {

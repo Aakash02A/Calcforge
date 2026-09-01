@@ -16,6 +16,51 @@ let lastPlotData = {
 };
 
 let hoverCoord = null;
+let isLockedToPlot = false;
+
+function formatCoord(val) {
+  if (val === null || val === undefined || !Number.isFinite(val)) return '—';
+  if (Math.abs(val) < 1e-9) return '0';
+  if (Math.abs(val) >= 10000 || (Math.abs(val) < 0.001 && val !== 0)) {
+    return Number(val.toPrecision(4)).toString();
+  }
+  return Number(val.toFixed(3)).toString();
+}
+
+function getCurvePointAtMathX(mathX, points) {
+  if (!points || points.length === 0) return null;
+  const valid = points.filter((p) => p.y !== null && Number.isFinite(p.y));
+  if (valid.length === 0) return null;
+
+  if (mathX <= valid[0].x) return valid[0];
+  if (mathX >= valid[valid.length - 1].x) return valid[valid.length - 1];
+
+  for (let i = 0; i < valid.length - 1; i++) {
+    const p1 = valid[i];
+    const p2 = valid[i + 1];
+    if (mathX >= p1.x && mathX <= p2.x) {
+      const span = p2.x - p1.x;
+      if (Math.abs(span) < 1e-12) return p1;
+      const t = (mathX - p1.x) / span;
+      return {
+        x: mathX,
+        y: p1.y + t * (p2.y - p1.y),
+      };
+    }
+  }
+  return valid[0];
+}
+
+function getDistanceToCurve(px, py, points, toPx, toPy, toMathX) {
+  if (!points || points.length === 0) return { distance: Infinity, point: null, pixelX: 0, pixelY: 0 };
+  const mathX = toMathX(px);
+  const cp = getCurvePointAtMathX(mathX, points);
+  if (!cp) return { distance: Infinity, point: null, pixelX: 0, pixelY: 0 };
+  const cpx = toPx(cp.x);
+  const cpy = toPy(cp.y);
+  const dist = Math.hypot(px - cpx, py - cpy);
+  return { distance: dist, point: cp, pixelX: cpx, pixelY: cpy };
+}
 
 function renderCanvas() {
   const canvas = document.getElementById('graph-canvas');
@@ -255,33 +300,68 @@ function renderCanvas() {
     ctx.restore();
   }
 
-  // ------------------------------------------------------------- 6. Interactive Crosshair & Tooltip
+  // ------------------------------------------------------------- 6. Mode Badge (Top Right)
+  if (points && points.length > 0) {
+    ctx.save();
+    const modeText = isLockedToPlot
+      ? `🔒 Locked to plot line • Double-click to free roam`
+      : `🧭 Free roam mode • Click plot line to lock`;
+    ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const modeBadgeW = ctx.measureText(modeText).width + 20;
+    const modeBadgeH = 22;
+    const modeBadgeX = marginL + plotW - modeBadgeW - 8;
+    const modeBadgeY = marginT + 8;
+
+    ctx.fillStyle = isLockedToPlot
+      ? (isDark ? 'rgba(232, 116, 59, 0.22)' : 'rgba(232, 116, 59, 0.15)')
+      : (isDark ? 'rgba(36, 41, 51, 0.85)' : 'rgba(240, 242, 245, 0.90)');
+    ctx.strokeStyle = isLockedToPlot
+      ? (isDark ? '#e8743b' : '#d9652c')
+      : (isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.14)');
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(modeBadgeX, modeBadgeY, modeBadgeW, modeBadgeH, 11);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isLockedToPlot
+      ? (isDark ? '#ff9d6b' : '#c2410c')
+      : (isDark ? '#a9b1bc' : '#64748b');
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(modeText, modeBadgeX + 10, modeBadgeY + modeBadgeH / 2);
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------- 7. Interactive Crosshair, Axis Digits & Tooltip
   if (hoverCoord && hoverCoord.x >= marginL && hoverCoord.x <= marginL + plotW && hoverCoord.y >= marginT && hoverCoord.y <= marginT + plotH) {
     const mathX = toMathX(hoverCoord.x);
+    const mathY = toMathY(hoverCoord.y);
 
-    let nearest = null;
-    if (points && points.length > 0) {
-      let minDist = Infinity;
-      for (const p of points) {
-        if (p.y !== null && Number.isFinite(p.y)) {
-          const dist = Math.abs(p.x - mathX);
-          if (dist < minDist) {
-            minDist = dist;
-            nearest = p;
-          }
-        }
-      }
+    const curveData = getDistanceToCurve(hoverCoord.x, hoverCoord.y, points, toPx, toPy, toMathX);
+    const hasCurve = curveData.point !== null;
+    const isNear = hasCurve && curveData.distance <= 32;
+
+    let targetX, targetY, dispX, dispY;
+
+    if (isLockedToPlot && hasCurve) {
+      // LOCKED TO PLOT LINE: pointer strictly aligns with and stays on the curve
+      targetX = curveData.pixelX;
+      targetY = curveData.pixelY;
+      dispX = curveData.point.x;
+      dispY = curveData.point.y;
+    } else {
+      // FREE ROAM MODE: pointer freely tracks mouse coordinates anywhere on canvas
+      targetX = hoverCoord.x;
+      targetY = hoverCoord.y;
+      dispX = mathX;
+      dispY = mathY;
     }
 
-    const targetX = nearest ? toPx(nearest.x) : hoverCoord.x;
-    const targetY = nearest ? toPy(nearest.y) : hoverCoord.y;
-    const dispX = nearest ? nearest.x : mathX;
-    const dispY = nearest ? nearest.y : toMathY(hoverCoord.y);
-
-    // Crosshair guidelines
+    // A. Crosshair guidelines
     ctx.save();
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = crosshairColor;
+    ctx.strokeStyle = isLockedToPlot ? crosshairColor : (isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)');
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(marginL, targetY);
@@ -291,37 +371,151 @@ function renderCanvas() {
     ctx.stroke();
     ctx.restore();
 
-    // Intersection highlight dot
-    ctx.fillStyle = isDark ? '#ff8a4c' : '#e8743b';
-    ctx.strokeStyle = isDark ? '#14181f' : '#ffffff';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(targetX, targetY, 5.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    // B. Free Roam snap guide if hovering near curve
+    if (!isLockedToPlot && isNear) {
+      ctx.save();
+      ctx.strokeStyle = isDark ? 'rgba(69, 196, 176, 0.6)' : 'rgba(13, 148, 136, 0.6)';
+      ctx.setLineDash([2, 3]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(targetX, targetY);
+      ctx.lineTo(curveData.pixelX, curveData.pixelY);
+      ctx.stroke();
 
-    // Tooltip badge
-    const tipText = `(${Number(dispX.toFixed(3))}, ${Number(dispY.toFixed(3))})`;
-    ctx.font = 'bold 11px ui-monospace, monospace';
-    const tipW = ctx.measureText(tipText).width + 16;
-    const tipH = 24;
-    let tipX = targetX + 12;
-    let tipY = targetY - 30;
-    if (tipX + tipW > marginL + plotW) tipX = targetX - tipW - 12;
-    if (tipY < marginT) tipY = targetY + 12;
+      ctx.fillStyle = isDark ? '#45c4b0' : '#0d9488';
+      ctx.beginPath();
+      ctx.arc(curveData.pixelX, curveData.pixelY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
-    ctx.fillStyle = isDark ? '#242933' : '#1f2328';
-    ctx.strokeStyle = isDark ? '#343b47' : '#ddd7c6';
-    ctx.lineWidth = 1;
+    // C. Axis Digit Badges on Margins
+    ctx.save();
+    ctx.font = 'bold 10px ui-monospace, SFMono-Regular, Consolas, monospace';
+
+    // X Axis Digit Badge (at bottom margin)
+    const xBadgeText = `X: ${formatCoord(dispX)}`;
+    const xBadgeW = ctx.measureText(xBadgeText).width + 12;
+    const xBadgeH = 18;
+    let xBadgeX = targetX - xBadgeW / 2;
+    if (xBadgeX < marginL) xBadgeX = marginL;
+    if (xBadgeX + xBadgeW > marginL + plotW) xBadgeX = marginL + plotW - xBadgeW;
+    const xBadgeY = marginT + plotH + 3;
+
+    ctx.fillStyle = isDark ? '#1f242d' : '#2b303b';
+    ctx.strokeStyle = isLockedToPlot ? (isDark ? '#e8743b' : '#e8743b') : (isDark ? '#45c4b0' : '#0d9488');
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.roundRect(tipX, tipY, tipW, tipH, 4);
+    ctx.roundRect(xBadgeX, xBadgeY, xBadgeW, xBadgeH, 3);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(tipText, tipX + 8, tipY + tipH / 2);
+    ctx.fillText(xBadgeText, xBadgeX + xBadgeW / 2, xBadgeY + xBadgeH / 2);
+
+    // Y Axis Digit Badge (at left margin)
+    const yBadgeText = isLockedToPlot ? `f(${variableName || 'x'}): ${formatCoord(dispY)}` : `Y: ${formatCoord(dispY)}`;
+    const yBadgeW = ctx.measureText(yBadgeText).width + 12;
+    const yBadgeH = 18;
+    const yBadgeX = marginL - yBadgeW - 3;
+    let yBadgeY = targetY - yBadgeH / 2;
+    if (yBadgeY < marginT) yBadgeY = marginT;
+    if (yBadgeY + yBadgeH > marginT + plotH) yBadgeY = marginT + plotH - yBadgeH;
+
+    ctx.fillStyle = isDark ? '#1f242d' : '#2b303b';
+    ctx.strokeStyle = isLockedToPlot ? (isDark ? '#e8743b' : '#e8743b') : (isDark ? '#45c4b0' : '#0d9488');
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(yBadgeX, yBadgeY, yBadgeW, yBadgeH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(yBadgeText, yBadgeX + yBadgeW / 2, yBadgeY + yBadgeH / 2);
+    ctx.restore();
+
+    // D. Intersection Highlight Point / Ring
+    ctx.save();
+    if (isLockedToPlot) {
+      // Locked: Glowing concentric rings firmly on plot line
+      ctx.fillStyle = isDark ? 'rgba(232, 116, 59, 0.25)' : 'rgba(232, 116, 59, 0.2)';
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = isDark ? '#ff8a4c' : '#e8743b';
+      ctx.strokeStyle = isDark ? '#14181f' : '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // Free Roam: Crosshair reticle ring
+      ctx.strokeStyle = isDark ? '#45c4b0' : '#0d9488';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = isDark ? '#45c4b0' : '#0d9488';
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // E. Floating Coordinate Tooltip Badge
+    ctx.save();
+    let tipPrimary = `(${formatCoord(dispX)}, ${formatCoord(dispY)})`;
+    let tipSecondary = null;
+
+    if (isLockedToPlot) {
+      tipPrimary = `f(${variableName || 'x'}) = ${formatCoord(dispY)}`;
+      tipSecondary = `x = ${formatCoord(dispX)} [LOCKED]`;
+    } else if (isNear) {
+      tipSecondary = `Click to snap to curve`;
+    }
+
+    ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Consolas, monospace';
+    const primW = ctx.measureText(tipPrimary).width;
+    let secW = 0;
+    if (tipSecondary) {
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      secW = ctx.measureText(tipSecondary).width;
+    }
+    const tipW = Math.max(primW, secW) + 18;
+    const tipH = tipSecondary ? 38 : 24;
+
+    let tipX = targetX + 14;
+    let tipY = targetY - tipH - 8;
+    if (tipX + tipW > marginL + plotW) tipX = targetX - tipW - 14;
+    if (tipY < marginT) tipY = targetY + 14;
+
+    ctx.fillStyle = isDark ? '#1a1f29' : '#1f2328';
+    ctx.strokeStyle = isLockedToPlot ? (isDark ? '#e8743b' : '#e8743b') : (isDark ? '#3d4452' : '#ddd7c6');
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(tipX, tipY, tipW, tipH, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Consolas, monospace';
+    ctx.fillStyle = isLockedToPlot ? (isDark ? '#ff9d6b' : '#ffedd5') : '#ffffff';
+    ctx.fillText(tipPrimary, tipX + 9, tipY + (tipSecondary ? 6 : 6));
+
+    if (tipSecondary) {
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillStyle = isLockedToPlot ? (isDark ? '#fba779' : '#fdba74') : (isDark ? '#45c4b0' : '#2dd4bf');
+      ctx.fillText(tipSecondary, tipX + 9, tipY + 21);
+    }
+    ctx.restore();
   }
 
   ctx.restore();
@@ -339,6 +533,7 @@ export async function plot() {
   const min = minInput ? Number(minInput.value) : -10;
   const max = maxInput ? Number(maxInput.value) : 10;
 
+  isLockedToPlot = false;
   lastPlotData.expr = expr;
   lastPlotData.variableName = variable;
   lastPlotData.xMin = Number.isFinite(min) ? min : -10;
@@ -458,11 +653,78 @@ export function initGraphView() {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
       };
+
+      if (isLockedToPlot) {
+        canvas.style.cursor = 'ew-resize';
+      } else {
+        const marginL = 56, marginR = 24, marginT = 28, marginB = 36;
+        const displayW = rect.width > 0 ? rect.width : 900;
+        const displayH = 420;
+        const plotW = Math.max(10, displayW - marginL - marginR);
+        const plotH = Math.max(10, displayH - marginT - marginB);
+
+        let { xMin, xMax, yMin, yMax, points } = lastPlotData;
+        if (xMin >= xMax) { xMin = -10; xMax = 10; }
+        if (yMin >= yMax || !Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1.5; yMax = 1.5; }
+
+        const toPx = (x) => marginL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
+        const toPy = (y) => marginT + plotH - ((y - yMin) / (yMax - yMin || 1)) * plotH;
+        const toMathX = (px) => xMin + ((px - marginL) / plotW) * (xMax - xMin);
+
+        const curveData = getDistanceToCurve(hoverCoord.x, hoverCoord.y, points, toPx, toPy, toMathX);
+        if (curveData.point && curveData.distance <= 24) {
+          canvas.style.cursor = 'pointer';
+        } else {
+          canvas.style.cursor = 'crosshair';
+        }
+      }
+
       renderCanvas();
     });
 
     canvas.addEventListener('mouseleave', () => {
       hoverCoord = null;
+      renderCanvas();
+    });
+
+    // Single Click:
+    // - Click ON plot line (within 24px) -> Lock strictly to curve
+    // - Click AWAY from plot line -> Unlock / return to free roam
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const marginL = 56, marginR = 24, marginT = 28, marginB = 36;
+      const displayW = rect.width > 0 ? rect.width : 900;
+      const displayH = 420;
+      const plotW = Math.max(10, displayW - marginL - marginR);
+      const plotH = Math.max(10, displayH - marginT - marginB);
+
+      let { xMin, xMax, yMin, yMax, points } = lastPlotData;
+      if (xMin >= xMax) { xMin = -10; xMax = 10; }
+      if (yMin >= yMax || !Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1.5; yMax = 1.5; }
+
+      const toPx = (x) => marginL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
+      const toPy = (y) => marginT + plotH - ((y - yMin) / (yMax - yMin || 1)) * plotH;
+      const toMathX = (px) => xMin + ((px - marginL) / plotW) * (xMax - xMin);
+
+      const curveData = getDistanceToCurve(clickX, clickY, points, toPx, toPy, toMathX);
+      if (curveData.point && curveData.distance <= 24) {
+        isLockedToPlot = true;
+        canvas.style.cursor = 'ew-resize';
+      } else {
+        isLockedToPlot = false;
+        canvas.style.cursor = 'crosshair';
+      }
+      renderCanvas();
+    });
+
+    // Double Click: Always unlock to free roam mode
+    canvas.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      isLockedToPlot = false;
+      canvas.style.cursor = 'crosshair';
       renderCanvas();
     });
 
