@@ -23,6 +23,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>
         <span>Canvas</span>
       </button>
+      <button class="cf-nav-btn" data-view="dashboard" title="Dashboard Canvas Layout Builder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Board</span>
+      </button>
       <button class="cf-nav-btn" data-view="variables" title="Variables &amp; Formulas">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4c-1 2-1 4 0 6s1 4 0 6M18 4c1 2 1 4 0 6s-1 4 0 6"/></svg>
         <span>Vars</span>
@@ -149,6 +153,92 @@
           <div class="d-flex gap-2 justify-content-center mt-2">
             <input type="text" class="form-control form-control-sm font-mono" id="quick-card-input" placeholder="expression" style="max-width:280px;">
             <button class="btn btn-sm btn-cf-accent" id="quick-card-add">Add card</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cf-view" id="view-dashboard">
+        <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+          <div>
+            <h2 class="h5 mb-0">Dashboard Canvas Layout Builder</h2>
+            <p class="cf-muted small mb-0">Interactive parameter toolbox &amp; real-time reactive calculation controls</p>
+          </div>
+          <div class="ms-auto d-flex gap-2">
+            <button class="btn btn-sm btn-cf-ghost" id="dashboard-sample-btn">+ Load Preset</button>
+            <button class="btn btn-sm btn-outline-danger" id="dashboard-clear-btn">Clear Canvas</button>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-xl-3 col-lg-4">
+            <div class="cf-card p-3 cf-toolbox-panel">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h3 class="h6 mb-0">Control Toolbox</h3>
+                <span class="cf-badge-unit">Drag &amp; Click</span>
+              </div>
+              <p class="cf-faint small mb-3">Add interactive controls to bind system variables to real-time inputs.</p>
+
+              <div class="cf-toolbox-list d-flex flex-column gap-2">
+                <div class="cf-toolbox-item p-2.5 d-flex align-items-center gap-3" data-widget-type="range">
+                  <div class="cf-toolbox-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="20" y2="12"/><circle cx="10" cy="12" r="3" fill="currentColor"/></svg>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="cf-toolbox-title">Range Slider</div>
+                    <div class="cf-toolbox-sub">Continuous scalar range</div>
+                  </div>
+                  <span class="cf-badge-unit font-mono">range</span>
+                </div>
+
+                <div class="cf-toolbox-item p-2.5 d-flex align-items-center gap-3" data-widget-type="dial">
+                  <div class="cf-toolbox-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="12" x2="12" y2="6"/></svg>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="cf-toolbox-title">Rotary Dial</div>
+                    <div class="cf-toolbox-sub">Circular radial knob</div>
+                  </div>
+                  <span class="cf-badge-unit font-mono">dial</span>
+                </div>
+
+                <div class="cf-toolbox-item p-2.5 d-flex align-items-center gap-3" data-widget-type="spinner">
+                  <div class="cf-toolbox-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="cf-toolbox-title">Numeric Spinner</div>
+                    <div class="cf-toolbox-sub">Precision stepper inputs</div>
+                  </div>
+                  <span class="cf-badge-unit font-mono">spinner</span>
+                </div>
+
+                <div class="cf-toolbox-item p-2.5 d-flex align-items-center gap-3" data-widget-type="toggle">
+                  <div class="cf-toolbox-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="8" cy="12" r="3" fill="currentColor"/></svg>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="cf-toolbox-title">Toggle Switch</div>
+                    <div class="cf-toolbox-sub">Binary state switch</div>
+                  </div>
+                  <span class="cf-badge-unit font-mono">toggle</span>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-top border-secondary-subtle">
+                <div class="small cf-muted mb-1 font-mono">Real-time Reactive Sweep</div>
+                <p class="cf-faint small mb-0">Altering any parameter triggers live re-evaluations across all dependent formulas and workspace cards.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-xl-9 col-lg-8">
+            <div class="cf-dashboard-canvas-dropzone p-3" id="dashboard-canvas-dropzone">
+              <div class="row g-3" id="dashboard-canvas-grid"></div>
+              <div class="cf-empty-state py-5 d-none" id="dashboard-canvas-empty">
+                <p class="h6 mb-2">Dashboard canvas is empty.</p>
+                <p class="small cf-muted mb-3">Drag controls from the toolbox or click any element on the left to start assembling your custom control dashboard.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

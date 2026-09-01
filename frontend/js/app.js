@@ -6,10 +6,13 @@ import { initVariablesView, refreshVariablesView } from './views/variables.js';
 import { initHistoryView, refreshHistoryView } from './views/history.js';
 import { initGraphView, refreshGraphView } from './views/graph.js?v=2.2';
 import { initSettingsView } from './views/settings.js';
+import { initDashboardView, refreshDashboardView } from './views/dashboard.js';
+import { DashboardStateManager, dashboardStateManager } from './dashboardStateManager.js';
 
 const VIEW_TITLES = {
   calculator: 'Calculator',
   workspace: 'Workspace canvas',
+  dashboard: 'Dashboard Canvas Layout Builder',
   variables: 'Variables & Formulas',
   history: 'History',
   graph: 'Graph',
@@ -22,6 +25,7 @@ function switchView(name) {
   document.getElementById('view-title').textContent = VIEW_TITLES[name] || name;
 
   if (name === 'workspace') refreshWorkspaceCanvas();
+  if (name === 'dashboard') refreshDashboardView();
   if (name === 'variables') refreshVariablesView();
   if (name === 'history') refreshHistoryView();
   if (name === 'graph') refreshGraphView();
@@ -54,11 +58,14 @@ async function pollHealth() {
 }
 
 async function main() {
+  window.DashboardStateManager = DashboardStateManager;
+  window.dashboardStateManager = dashboardStateManager;
   document.documentElement.setAttribute('data-theme', state.theme);
   initThemeToggle();
   initNav();
   initCalculatorView();
   initWorkspaceView();
+  initDashboardView();
   initVariablesView();
   initHistoryView();
   initGraphView();

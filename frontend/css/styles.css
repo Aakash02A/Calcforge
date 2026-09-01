@@ -638,3 +638,238 @@ input.form-control:focus, select.form-select:focus, textarea.form-control:focus 
 .cf-code-export-drawer pre code {
   color: inherit;
 }
+
+.cf-toolbox-panel {
+  position: sticky;
+  top: 0;
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  box-shadow: var(--cf-shadow);
+}
+
+.cf-toolbox-list {
+  user-select: none;
+}
+
+.cf-toolbox-item {
+  background: var(--cf-surface-2);
+  border: 1px solid var(--cf-border-soft);
+  border-radius: var(--cf-radius-sm);
+  cursor: grab;
+  transition: all 0.15s ease;
+}
+
+.cf-toolbox-item:hover {
+  background: var(--cf-surface-3);
+  border-color: var(--cf-accent);
+  transform: translateY(-1px);
+}
+
+.cf-toolbox-item.dragging {
+  opacity: 0.4;
+  border-color: var(--cf-accent);
+  cursor: grabbing;
+}
+
+.cf-toolbox-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--cf-radius-sm);
+  background: var(--cf-surface-3);
+  color: var(--cf-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cf-toolbox-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cf-text);
+  line-height: 1.2;
+}
+
+.cf-toolbox-sub {
+  font-size: 0.72rem;
+  color: var(--cf-text-faint);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.cf-dashboard-canvas-dropzone {
+  min-height: 380px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 2px dashed var(--cf-border-soft);
+  border-radius: var(--cf-radius);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .cf-dashboard-canvas-dropzone {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.cf-dashboard-canvas-dropzone.drag-over {
+  border-color: var(--cf-accent);
+  background: rgba(232, 116, 59, 0.08);
+  box-shadow: inset 0 0 15px rgba(232, 116, 59, 0.15);
+}
+
+.cf-dashboard-widget-card {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  padding: 14px 16px;
+  box-shadow: var(--cf-shadow);
+  transition: all 0.15s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-dashboard-widget-card:hover {
+  border-color: var(--cf-border-soft);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+.cf-widget-header {
+  border-bottom: 1px solid var(--cf-border-soft);
+  padding-bottom: 8px;
+}
+
+.cf-widget-type-icon {
+  font-size: 0.95rem;
+  color: var(--cf-accent);
+}
+
+.cf-widget-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cf-text);
+}
+
+.cf-widget-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.cf-widget-val-badge {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--cf-accent-strong);
+}
+
+.cf-dashboard-range-slider {
+  accent-color: var(--cf-accent);
+}
+
+.cf-dial-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+  user-select: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.cf-dial-container:active {
+  cursor: grabbing;
+}
+
+.cf-dial-svg {
+  width: 100%;
+  height: 100%;
+  transform: scale(1);
+}
+
+.cf-dial-bg-track {
+  fill: none;
+  stroke: var(--cf-surface-3);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.cf-dial-active-arc {
+  fill: none;
+  stroke: var(--cf-accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.cf-dial-knob {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--cf-surface-2), var(--cf-surface-3));
+  border: 2px solid var(--cf-border);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.05s linear;
+}
+
+.cf-dial-pointer {
+  position: absolute;
+  top: 8px;
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--cf-accent-strong);
+}
+
+.cf-dial-val-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--cf-text);
+  pointer-events: none;
+}
+
+.cf-spinner-group {
+  background: var(--cf-surface-2);
+  border-radius: var(--cf-radius-sm);
+  overflow: hidden;
+}
+
+.cf-spinner-input {
+  font-size: 1.05rem;
+  font-weight: 600;
+  background: transparent !important;
+  color: var(--cf-text) !important;
+  border: 1px solid var(--cf-border-soft);
+}
+
+.cf-toggle-switch-input {
+  width: 3.2em !important;
+  height: 1.7em !important;
+  cursor: pointer;
+}
+
+.cf-toggle-switch-input:checked {
+  background-color: var(--cf-accent) !important;
+  border-color: var(--cf-accent) !important;
+}
+
+.active-toggle {
+  color: var(--cf-success) !important;
+  border-color: var(--cf-success) !important;
+  background: rgba(61, 214, 140, 0.12) !important;
+}
+
