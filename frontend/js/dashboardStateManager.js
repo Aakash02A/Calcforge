@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { evaluateOffline, formatNumber } from './engine/localEngine.js';
 import { renderTrail } from './utils.js';
 import { setVariableCache } from './views/workspace.js';
-import { refreshGraphView } from './views/graph.js?v=2.2';
+import { refreshGraphView } from './views/graph.js?v=2.3';
 
 export class DashboardStateManager {
   constructor() {

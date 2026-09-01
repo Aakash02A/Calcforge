@@ -125,9 +125,8 @@ export const LocalApi = {
   tipSplit: (payload) => request('POST', '/api/v1/local/finance/tip-split', payload),
 
   graph: (payload) => request('POST', '/api/v1/local/graph', payload),
+  analyzeGraph: (payload) => request('POST', '/api/graph/analyze', payload),
 };
-
-// ---------------------------------------------------------------- cloud (optional)
 
 export const CloudApi = {
   featureFlags: () => request('GET', '/api/v1/cloud/feature-flags'),

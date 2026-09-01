@@ -1,6 +1,5 @@
 import { state } from '../state.js';
 import { LocalApi } from '../api.js';
-import { toast } from '../utils.js';
 import { sampleFunction } from '../engine/localEngine.js';
 import { activeWorkspaceVariables } from './workspace.js';
 
@@ -13,10 +12,13 @@ let lastPlotData = {
   yMin: -1.2,
   yMax: 1.2,
   errorMsg: null,
+  anomalies: [],
+  steepRegions: [],
 };
 
 let hoverCoord = null;
 let isLockedToPlot = false;
+let activeAnomalyHit = null;
 
 function formatCoord(val) {
   if (val === null || val === undefined || !Number.isFinite(val)) return '—';
@@ -62,12 +64,214 @@ function getDistanceToCurve(px, py, points, toPx, toPy, toMathX) {
   return { distance: dist, point: cp, pixelX: cpx, pixelY: cpy };
 }
 
+function detectLocalAnomalies(points, xMin, xMax) {
+  const anomalies = [];
+  if (!points || points.length < 2) return anomalies;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+
+    if (p1.y !== null && p2.y !== null) {
+      const dx = p2.x - p1.x;
+      if (Math.abs(dx) > 1e-12) {
+        const slope = (p2.y - p1.y) / dx;
+        const signFlip = (p1.y > 0 && p2.y < 0) || (p1.y < 0 && p2.y > 0);
+        if (Math.abs(slope) > 40 && signFlip && (Math.abs(p1.y) > 1.2 || Math.abs(p2.y) > 1.2)) {
+          const asympX = (p1.x + p2.x) / 2;
+          anomalies.push({
+            x: asympX,
+            type: 'ASYMPTOTE',
+            description: 'Vertical Asymptote (Sign Inversion)',
+            rootCause: `Massive slope (${slope.toFixed(1)}) with diverging limits`,
+            gradient: slope,
+            leftValue: p1.y,
+            rightValue: p2.y,
+            leftBound: p1.x,
+            rightBound: p2.x,
+          });
+        }
+      }
+    } else if (p1.y === null || p2.y === null) {
+      const prevValid = i > 0 ? points[i - 1] : null;
+      const nextValid = i + 2 < points.length ? points[i + 2] : null;
+
+      if (prevValid && nextValid && prevValid.y !== null && nextValid.y !== null) {
+        const signFlip = (prevValid.y > 0 && nextValid.y < 0) || (prevValid.y < 0 && nextValid.y > 0);
+        if (signFlip && (Math.abs(prevValid.y) > 1.2 || Math.abs(nextValid.y) > 1.2)) {
+          const nullX = p1.y === null ? p1.x : p2.x;
+          if (!anomalies.some((a) => Math.abs(a.x - nullX) < 1e-4)) {
+            anomalies.push({
+              x: nullX,
+              type: 'ASYMPTOTE',
+              description: 'Vertical Asymptote (Division by Zero Pole)',
+              rootCause: 'Values diverge to opposite infinite limits around undefined pole',
+              leftValue: prevValid.y,
+              rightValue: nextValid.y,
+              leftBound: prevValid.x,
+              rightBound: nextValid.x,
+            });
+            continue;
+          }
+        }
+      }
+
+      const holeX = p1.y === null ? p1.x : p2.x;
+      if (!anomalies.some((a) => Math.abs(a.x - holeX) < 1e-4)) {
+        anomalies.push({
+          x: holeX,
+          type: 'HOLE',
+          description: 'Domain Discontinuity / Singularity',
+          rootCause: 'Function transitioned into undefined non-real domain',
+          leftBound: p1.x,
+          rightBound: p2.x,
+        });
+      }
+    }
+  }
+
+  return anomalies;
+}
+
+function checkAnomalyHit(mouseX, mouseY, anomalies, points, toPx, toPy, marginT, marginB, plotH) {
+  if (!anomalies || anomalies.length === 0) return null;
+  const radius = 8;
+
+  for (const anomaly of anomalies) {
+    const numX = Number(anomaly.x);
+    if (!Number.isFinite(numX)) continue;
+    const px = toPx(numX);
+
+    const isAsymptote = anomaly.type === 'ASYMPTOTE';
+    const isHole = anomaly.type === 'HOLE';
+    const isPrecision = anomaly.type === 'PRECISION_LOSS';
+
+    if (isAsymptote) {
+      const dotY = marginT + 22;
+      const dotDist = Math.hypot(mouseX - px, mouseY - dotY);
+      const lineDist = Math.abs(mouseX - px);
+
+      if (dotDist <= radius || (lineDist <= radius && mouseY >= marginT && mouseY <= marginT + plotH)) {
+        return {
+          anomaly,
+          pixelX: px,
+          pixelY: dotDist <= radius ? dotY : mouseY,
+          hitType: 'ASYMPTOTE',
+        };
+      }
+    } else if (isHole) {
+      let targetPy = toPy(0);
+      if (anomaly.y !== null && anomaly.y !== undefined && Number.isFinite(Number(anomaly.y))) {
+        targetPy = toPy(Number(anomaly.y));
+      } else {
+        const cp = getCurvePointAtMathX(numX, points);
+        if (cp && cp.y !== null && Number.isFinite(cp.y)) {
+          targetPy = toPy(cp.y);
+        }
+      }
+      targetPy = Math.max(marginT + 10, Math.min(marginT + plotH - 10, targetPy));
+      const holeDist = Math.hypot(mouseX - px, mouseY - targetPy);
+      const lineDist = Math.abs(mouseX - px);
+
+      if (holeDist <= radius || (lineDist <= radius && mouseY >= marginT && mouseY <= marginT + plotH)) {
+        return {
+          anomaly,
+          pixelX: px,
+          pixelY: targetPy,
+          hitType: 'HOLE',
+        };
+      }
+    } else if (isPrecision) {
+      const lineDist = Math.abs(mouseX - px);
+      if (lineDist <= radius && mouseY >= marginT && mouseY <= marginT + plotH) {
+        return {
+          anomaly,
+          pixelX: px,
+          pixelY: mouseY,
+          hitType: 'PRECISION_LOSS',
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function updateAnomalyPopover(hitResult) {
+  let popover = document.getElementById('graph-anomaly-popover');
+  if (!popover) {
+    const wrap = document.querySelector('.cf-graph-canvas-wrap');
+    if (wrap) {
+      popover = document.createElement('div');
+      popover.id = 'graph-anomaly-popover';
+      popover.className = 'cf-anomaly-popover d-none';
+      wrap.appendChild(popover);
+    }
+  }
+  if (!popover) return;
+
+  if (!hitResult) {
+    popover.classList.add('d-none');
+    return;
+  }
+
+  const { anomaly, pixelX, pixelY } = hitResult;
+  const numX = Number(anomaly.x);
+  const formattedX = formatCoord(numX);
+
+  popover.className = 'cf-anomaly-popover';
+
+  let badgeHtml = '';
+  let titleHtml = '';
+  let explanationHtml = '';
+  let detailHtml = '';
+
+  if (anomaly.type === 'ASYMPTOTE') {
+    popover.classList.add('popover-asymptote');
+    badgeHtml = '<div class="cf-anomaly-badge badge-asymptote">⚠️ Critical Vulnerability</div>';
+    titleHtml = `<div class="cf-anomaly-title font-mono">Asymptotic Discontinuity detected at x=${formattedX}</div>`;
+    explanationHtml = `<div class="cf-anomaly-explanation">Critical Vulnerability: Asymptotic Discontinuity detected at x=${formattedX}; value approaches infinity.</div>`;
+    detailHtml = `<div class="cf-anomaly-detail font-mono">${anomaly.rootCause || 'Denominator approaches zero with diverging limits.'}</div>`;
+  } else if (anomaly.type === 'HOLE') {
+    popover.classList.add('popover-hole');
+    badgeHtml = '<div class="cf-anomaly-badge badge-hole">⭕ Structural Discontinuity</div>';
+    titleHtml = `<div class="cf-anomaly-title font-mono">Mathematical Discontinuity / Hole at x=${formattedX}</div>`;
+    explanationHtml = `<div class="cf-anomaly-explanation">Structural Discontinuity: Function transitions into undefined or non-real domain at coordinate x=${formattedX}.</div>`;
+    detailHtml = `<div class="cf-anomaly-detail font-mono">${anomaly.rootCause || anomaly.description || 'Non-real or division by zero singularity.'}</div>`;
+  } else {
+    popover.classList.add('popover-precision');
+    badgeHtml = '<div class="cf-anomaly-badge badge-precision">⚡ Precision Warning</div>';
+    titleHtml = `<div class="cf-anomaly-title font-mono">Numerical Precision Loss at x=${formattedX}</div>`;
+    explanationHtml = `<div class="cf-anomaly-explanation">Precision Loss: Extreme high-frequency oscillation exceeds sampling resolution at x=${formattedX}.</div>`;
+    detailHtml = `<div class="cf-anomaly-detail font-mono">${anomaly.rootCause || anomaly.description || 'Rapid gradient inversion.'}</div>`;
+  }
+
+  popover.innerHTML = `${badgeHtml}${titleHtml}${explanationHtml}${detailHtml}`;
+
+  const canvas = document.getElementById('graph-canvas');
+  const canvasW = canvas ? canvas.clientWidth : 900;
+  const canvasH = canvas ? canvas.clientHeight : 420;
+  const offsetLeft = canvas ? canvas.offsetLeft : 10;
+  const offsetTop = canvas ? canvas.offsetTop : 10;
+
+  const popoverW = 340;
+  let posX = offsetLeft + pixelX + 16;
+  if (pixelX + 16 + popoverW > canvasW - 10) {
+    posX = Math.max(offsetLeft + 10, offsetLeft + pixelX - popoverW - 16);
+  }
+
+  let posY = offsetTop + Math.max(12, Math.min(canvasH - 120, pixelY - 30));
+
+  popover.style.left = `${posX}px`;
+  popover.style.top = `${posY}px`;
+  popover.classList.remove('d-none');
+}
+
 function renderCanvas() {
   const canvas = document.getElementById('graph-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  // Handle HiDPI crisp rendering
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   const containerW = canvas.parentElement ? canvas.parentElement.clientWidth - 20 : 0;
@@ -94,11 +298,10 @@ function renderCanvas() {
   const curveColor = isDark ? '#45c4b0' : '#0d9488';
   const crosshairColor = isDark ? 'rgba(232, 116, 59, 0.85)' : 'rgba(232, 116, 59, 0.95)';
 
-  // Fill canvas background
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, w, h);
 
-  const { points, variableName, expr, errorMsg } = lastPlotData;
+  const { points, variableName, expr, errorMsg, anomalies = [] } = lastPlotData;
   let { xMin, xMax, yMin, yMax } = lastPlotData;
 
   if (xMin >= xMax) { xMin = -10; xMax = 10; }
@@ -116,7 +319,6 @@ function renderCanvas() {
   const xRange = xMax - xMin;
   const yRange = yMax - yMin;
 
-  // ------------------------------------------------------------- 1. Minor Sub-Grid
   const subDivsX = 24;
   const subDivsY = 18;
   ctx.strokeStyle = gridColorMinor;
@@ -134,13 +336,11 @@ function renderCanvas() {
   }
   ctx.stroke();
 
-  // ------------------------------------------------------------- 2. Major Grid & Ticks
   const numXSteps = 8;
   const numYSteps = 6;
 
   ctx.font = '11px ui-monospace, SFMono-Regular, Consolas, monospace';
 
-  // Horizontal major grid lines & Y labels
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   for (let i = 0; i <= numYSteps; i++) {
@@ -160,7 +360,6 @@ function renderCanvas() {
     ctx.fillText(label, marginL - 8, py);
   }
 
-  // Vertical major grid lines & X labels
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   for (let i = 0; i <= numXSteps; i++) {
@@ -180,12 +379,10 @@ function renderCanvas() {
     ctx.fillText(label, px, marginT + plotH + 8);
   }
 
-  // Outer plot frame
   ctx.strokeStyle = gridColorMajor;
   ctx.lineWidth = 1;
   ctx.strokeRect(marginL, marginT, plotW, plotH);
 
-  // ------------------------------------------------------------- 3. Coordinate Axes (x=0, y=0)
   ctx.strokeStyle = axisColor;
   ctx.lineWidth = 1.6;
   if (xMin <= 0 && xMax >= 0) {
@@ -203,7 +400,6 @@ function renderCanvas() {
     ctx.stroke();
   }
 
-  // Axis Titles
   ctx.fillStyle = isDark ? '#ff8a4c' : '#e8743b';
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'right';
@@ -213,7 +409,6 @@ function renderCanvas() {
   ctx.textAlign = 'left';
   ctx.fillText(expr ? `f(${variableName || 'x'}) = ${expr}` : '2D Function Grid', marginL, 14);
 
-  // ------------------------------------------------------------- 4. Plotted Function Curve
   if (points && points.length > 0) {
     const defined = points.filter((p) => p.y !== null && Number.isFinite(p.y));
     if (defined.length > 0) {
@@ -222,7 +417,6 @@ function renderCanvas() {
       ctx.rect(marginL, marginT, plotW, plotH);
       ctx.clip();
 
-      // Subtle area fill under the curve
       const zeroPy = Math.max(marginT, Math.min(marginT + plotH, toPy(0)));
       const grad = ctx.createLinearGradient(0, marginT, 0, marginT + plotH);
       grad.addColorStop(0, isDark ? 'rgba(69, 196, 176, 0.18)' : 'rgba(13, 148, 136, 0.14)');
@@ -258,7 +452,6 @@ function renderCanvas() {
         ctx.fill();
       }
 
-      // Smooth Curve line
       ctx.strokeStyle = curveColor;
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
@@ -283,7 +476,105 @@ function renderCanvas() {
     }
   }
 
-  // ------------------------------------------------------------- 5. Error or Info Overlay
+  if (anomalies && anomalies.length > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(marginL, marginT, plotW, plotH);
+    ctx.clip();
+
+    anomalies.forEach((anomaly) => {
+      const numX = Number(anomaly.x);
+      if (!Number.isFinite(numX) || numX < xMin || numX > xMax) return;
+
+      const px = toPx(numX);
+      const isAsymptote = anomaly.type === 'ASYMPTOTE';
+      const isHole = anomaly.type === 'HOLE';
+      const isPrecision = anomaly.type === 'PRECISION_LOSS';
+
+      const isHit = activeAnomalyHit && activeAnomalyHit.anomaly === anomaly;
+
+      if (isAsymptote) {
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = isHit ? '#ff4d6d' : 'rgba(239, 68, 68, 0.85)';
+        ctx.lineWidth = isHit ? 2.5 : 1.6;
+        ctx.beginPath();
+        ctx.moveTo(px, marginT);
+        ctx.lineTo(px, marginT + plotH);
+        ctx.stroke();
+
+        const glowGrad = ctx.createRadialGradient(px, marginT + 22, 2, px, marginT + 22, 18);
+        glowGrad.addColorStop(0, isHit ? 'rgba(255, 77, 109, 0.95)' : 'rgba(239, 68, 68, 0.85)');
+        glowGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(px, marginT + 22, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = isHit ? '#ff4d6d' : '#ef4444';
+        ctx.beginPath();
+        ctx.arc(px, marginT + 22, isHit ? 6.5 : 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      } else if (isHole) {
+        ctx.save();
+        let targetPy = toPy(0);
+        if (anomaly.y !== null && anomaly.y !== undefined && Number.isFinite(Number(anomaly.y))) {
+          targetPy = toPy(Number(anomaly.y));
+        } else {
+          const cp = getCurvePointAtMathX(numX, points);
+          if (cp && cp.y !== null && Number.isFinite(cp.y)) {
+            targetPy = toPy(cp.y);
+          }
+        }
+        targetPy = Math.max(marginT + 10, Math.min(marginT + plotH - 10, targetPy));
+
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = isHit ? 'rgba(244, 63, 94, 0.8)' : 'rgba(244, 63, 94, 0.55)';
+        ctx.lineWidth = isHit ? 1.8 : 1.2;
+        ctx.beginPath();
+        ctx.moveTo(px, marginT);
+        ctx.lineTo(px, marginT + plotH);
+        ctx.stroke();
+
+        const holeGlow = ctx.createRadialGradient(px, targetPy, 2, px, targetPy, 18);
+        holeGlow.addColorStop(0, 'rgba(244, 63, 94, 0.9)');
+        holeGlow.addColorStop(1, 'rgba(244, 63, 94, 0)');
+        ctx.fillStyle = holeGlow;
+        ctx.beginPath();
+        ctx.arc(px, targetPy, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = isDark ? '#14181f' : '#ffffff';
+        ctx.strokeStyle = isHit ? '#fb7185' : '#f43f5e';
+        ctx.lineWidth = isHit ? 3.5 : 2.4;
+        ctx.beginPath();
+        ctx.arc(px, targetPy, isHit ? 7 : 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } else if (isPrecision) {
+        ctx.save();
+        ctx.fillStyle = isHit ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.15)';
+        ctx.fillRect(px - 8, marginT, 16, plotH);
+
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = isHit ? 2 : 1.5;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(px, marginT);
+        ctx.lineTo(px, marginT + plotH);
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+
+    ctx.restore();
+  }
+
   if (errorMsg) {
     ctx.save();
     ctx.fillStyle = isDark ? 'rgba(20, 24, 31, 0.75)' : 'rgba(255, 255, 255, 0.75)';
@@ -300,24 +591,29 @@ function renderCanvas() {
     ctx.restore();
   }
 
-  // ------------------------------------------------------------- 6. Mode Badge (Top Right)
   if (points && points.length > 0) {
     ctx.save();
-    const modeText = isLockedToPlot
+    const anomalyCount = anomalies.length;
+    let badgeLabel = isLockedToPlot
       ? `🔒 Locked to plot line • Double-click to free roam`
       : `🧭 Free roam mode • Click plot line to lock`;
+
+    if (anomalyCount > 0) {
+      badgeLabel = `⚠️ ${anomalyCount} Anomaly Detected • ${badgeLabel}`;
+    }
+
     ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    const modeBadgeW = ctx.measureText(modeText).width + 20;
+    const modeBadgeW = ctx.measureText(badgeLabel).width + 20;
     const modeBadgeH = 22;
     const modeBadgeX = marginL + plotW - modeBadgeW - 8;
     const modeBadgeY = marginT + 8;
 
     ctx.fillStyle = isLockedToPlot
       ? (isDark ? 'rgba(232, 116, 59, 0.22)' : 'rgba(232, 116, 59, 0.15)')
-      : (isDark ? 'rgba(36, 41, 51, 0.85)' : 'rgba(240, 242, 245, 0.90)');
+      : (anomalyCount > 0 ? (isDark ? 'rgba(239, 68, 68, 0.18)' : 'rgba(239, 68, 68, 0.12)') : (isDark ? 'rgba(36, 41, 51, 0.85)' : 'rgba(240, 242, 245, 0.90)'));
     ctx.strokeStyle = isLockedToPlot
       ? (isDark ? '#e8743b' : '#d9652c')
-      : (isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.14)');
+      : (anomalyCount > 0 ? '#ef4444' : (isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.14)'));
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(modeBadgeX, modeBadgeY, modeBadgeW, modeBadgeH, 11);
@@ -326,15 +622,14 @@ function renderCanvas() {
 
     ctx.fillStyle = isLockedToPlot
       ? (isDark ? '#ff9d6b' : '#c2410c')
-      : (isDark ? '#a9b1bc' : '#64748b');
+      : (anomalyCount > 0 ? (isDark ? '#fca5a5' : '#dc2626') : (isDark ? '#a9b1bc' : '#64748b'));
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(modeText, modeBadgeX + 10, modeBadgeY + modeBadgeH / 2);
+    ctx.fillText(badgeLabel, modeBadgeX + 10, modeBadgeY + modeBadgeH / 2);
     ctx.restore();
   }
 
-  // ------------------------------------------------------------- 7. Interactive Crosshair, Axis Digits & Tooltip
-  if (hoverCoord && hoverCoord.x >= marginL && hoverCoord.x <= marginL + plotW && hoverCoord.y >= marginT && hoverCoord.y <= marginT + plotH) {
+  if (hoverCoord && !activeAnomalyHit && hoverCoord.x >= marginL && hoverCoord.x <= marginL + plotW && hoverCoord.y >= marginT && hoverCoord.y <= marginT + plotH) {
     const mathX = toMathX(hoverCoord.x);
     const mathY = toMathY(hoverCoord.y);
 
@@ -345,20 +640,17 @@ function renderCanvas() {
     let targetX, targetY, dispX, dispY;
 
     if (isLockedToPlot && hasCurve) {
-      // LOCKED TO PLOT LINE: pointer strictly aligns with and stays on the curve
       targetX = curveData.pixelX;
       targetY = curveData.pixelY;
       dispX = curveData.point.x;
       dispY = curveData.point.y;
     } else {
-      // FREE ROAM MODE: pointer freely tracks mouse coordinates anywhere on canvas
       targetX = hoverCoord.x;
       targetY = hoverCoord.y;
       dispX = mathX;
       dispY = mathY;
     }
 
-    // A. Crosshair guidelines
     ctx.save();
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = isLockedToPlot ? crosshairColor : (isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)');
@@ -371,7 +663,6 @@ function renderCanvas() {
     ctx.stroke();
     ctx.restore();
 
-    // B. Free Roam snap guide if hovering near curve
     if (!isLockedToPlot && isNear) {
       ctx.save();
       ctx.strokeStyle = isDark ? 'rgba(69, 196, 176, 0.6)' : 'rgba(13, 148, 136, 0.6)';
@@ -389,11 +680,9 @@ function renderCanvas() {
       ctx.restore();
     }
 
-    // C. Axis Digit Badges on Margins
     ctx.save();
     ctx.font = 'bold 10px ui-monospace, SFMono-Regular, Consolas, monospace';
 
-    // X Axis Digit Badge (at bottom margin)
     const xBadgeText = `X: ${formatCoord(dispX)}`;
     const xBadgeW = ctx.measureText(xBadgeText).width + 12;
     const xBadgeH = 18;
@@ -415,7 +704,6 @@ function renderCanvas() {
     ctx.textBaseline = 'middle';
     ctx.fillText(xBadgeText, xBadgeX + xBadgeW / 2, xBadgeY + xBadgeH / 2);
 
-    // Y Axis Digit Badge (at left margin)
     const yBadgeText = isLockedToPlot ? `f(${variableName || 'x'}): ${formatCoord(dispY)}` : `Y: ${formatCoord(dispY)}`;
     const yBadgeW = ctx.measureText(yBadgeText).width + 12;
     const yBadgeH = 18;
@@ -438,10 +726,8 @@ function renderCanvas() {
     ctx.fillText(yBadgeText, yBadgeX + yBadgeW / 2, yBadgeY + yBadgeH / 2);
     ctx.restore();
 
-    // D. Intersection Highlight Point / Ring
     ctx.save();
     if (isLockedToPlot) {
-      // Locked: Glowing concentric rings firmly on plot line
       ctx.fillStyle = isDark ? 'rgba(232, 116, 59, 0.25)' : 'rgba(232, 116, 59, 0.2)';
       ctx.beginPath();
       ctx.arc(targetX, targetY, 9, 0, Math.PI * 2);
@@ -455,7 +741,6 @@ function renderCanvas() {
       ctx.fill();
       ctx.stroke();
     } else {
-      // Free Roam: Crosshair reticle ring
       ctx.strokeStyle = isDark ? '#45c4b0' : '#0d9488';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -469,7 +754,6 @@ function renderCanvas() {
     }
     ctx.restore();
 
-    // E. Floating Coordinate Tooltip Badge
     ctx.save();
     let tipPrimary = `(${formatCoord(dispX)}, ${formatCoord(dispY)})`;
     let tipSecondary = null;
@@ -534,11 +818,16 @@ export async function plot() {
   const max = maxInput ? Number(maxInput.value) : 10;
 
   isLockedToPlot = false;
+  activeAnomalyHit = null;
+  updateAnomalyPopover(null);
+
   lastPlotData.expr = expr;
   lastPlotData.variableName = variable;
   lastPlotData.xMin = Number.isFinite(min) ? min : -10;
   lastPlotData.xMax = Number.isFinite(max) ? max : 10;
   lastPlotData.errorMsg = null;
+  lastPlotData.anomalies = [];
+  lastPlotData.steepRegions = [];
 
   if (!expr) {
     lastPlotData.points = null;
@@ -559,8 +848,11 @@ export async function plot() {
   const fixedVars = { ...activeWorkspaceVariables() };
   delete fixedVars[variable.toLowerCase()];
 
-  const applyPoints = (pts, sourceDesc) => {
+  const applyPoints = (pts, anomaliesList, steepList, sourceDesc) => {
     lastPlotData.points = pts;
+    lastPlotData.anomalies = anomaliesList || [];
+    lastPlotData.steepRegions = steepList || [];
+
     const defined = pts.filter((p) => p.y !== null && Number.isFinite(p.y));
     if (defined.length === 0) {
       lastPlotData.yMin = -2;
@@ -581,24 +873,67 @@ export async function plot() {
 
   if (state.online) {
     try {
-      const res = await LocalApi.graph({
+      const res = await LocalApi.analyzeGraph({
         expression: expr,
         variable,
-        min,
-        max,
-        samples: 300,
+        startX: min,
+        endX: max,
+        precision: 15,
+        baseSamples: 150,
+        subdivisionFactor: 10,
+        thresholdPercentage: 10.0,
         variables: fixedVars,
         workspaceId: state.activeWorkspaceId || undefined,
         angleMode: state.angleMode,
       });
-      const points = res.points.map((p) => ({
+
+      const points = (res.points || []).map((p) => ({
         x: Number(p.x),
         y: p.y === null ? null : Number(p.y),
       }));
-      applyPoints(points, `Plotted ${points.length} points via Spring Boot backend engine.`);
+
+      let anomalies = [];
+      if (res.anomalies) {
+        if (Array.isArray(res.anomalies)) {
+          anomalies = res.anomalies;
+        } else if (typeof res.anomalies === 'object') {
+          anomalies = Object.values(res.anomalies);
+        }
+      }
+
+      const steepRegions = res.steepRegions || [];
+      const anomText = anomalies.length > 0 ? ` • ${anomalies.length} anomaly detected` : '';
+      const injectedText = res.injectedPoints > 0 ? ` (${res.injectedPoints} injected high-density points)` : '';
+
+      applyPoints(
+        points,
+        anomalies,
+        steepRegions,
+        `Adaptive scan: ${points.length} points${injectedText}${anomText} via Spring Boot backend.`
+      );
       return;
     } catch (err) {
-      if (statusEl) statusEl.textContent = `Backend graphing notice (${err.message}); falling back to local engine...`;
+      try {
+        const res = await LocalApi.graph({
+          expression: expr,
+          variable,
+          min,
+          max,
+          samples: 300,
+          variables: fixedVars,
+          workspaceId: state.activeWorkspaceId || undefined,
+          angleMode: state.angleMode,
+        });
+        const points = res.points.map((p) => ({
+          x: Number(p.x),
+          y: p.y === null ? null : Number(p.y),
+        }));
+        const anomalies = detectLocalAnomalies(points, min, max);
+        applyPoints(points, anomalies, [], `Plotted ${points.length} points via Spring Boot backend.`);
+        return;
+      } catch (innerErr) {
+        if (statusEl) statusEl.textContent = `Backend notice (${innerErr.message}); falling back to local engine...`;
+      }
     }
   }
 
@@ -607,7 +942,8 @@ export async function plot() {
       variables: fixedVars,
       angleMode: state.angleMode,
     });
-    applyPoints(points, 'Plotted using client-side offline calculation engine.');
+    const anomalies = detectLocalAnomalies(points, min, max);
+    applyPoints(points, anomalies, [], `Plotted locally (${points.length} points, ${anomalies.length} anomalies detected).`);
   } catch (err) {
     lastPlotData.points = null;
     lastPlotData.errorMsg = err.message || 'Could not evaluate expression.';
@@ -654,28 +990,37 @@ export function initGraphView() {
         y: e.clientY - rect.top,
       };
 
-      if (isLockedToPlot) {
-        canvas.style.cursor = 'ew-resize';
+      const marginL = 56, marginR = 24, marginT = 28, marginB = 36;
+      const displayW = rect.width > 0 ? rect.width : 900;
+      const displayH = 420;
+      const plotW = Math.max(10, displayW - marginL - marginR);
+      const plotH = Math.max(10, displayH - marginT - marginB);
+
+      let { xMin, xMax, yMin, yMax, points, anomalies } = lastPlotData;
+      if (xMin >= xMax) { xMin = -10; xMax = 10; }
+      if (yMin >= yMax || !Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1.5; yMax = 1.5; }
+
+      const toPx = (x) => marginL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
+      const toPy = (y) => marginT + plotH - ((y - yMin) / (yMax - yMin || 1)) * plotH;
+      const toMathX = (px) => xMin + ((px - marginL) / plotW) * (xMax - xMin);
+
+      const hit = checkAnomalyHit(hoverCoord.x, hoverCoord.y, anomalies, points, toPx, toPy, marginT, marginB, plotH);
+      activeAnomalyHit = hit;
+
+      if (hit) {
+        canvas.style.cursor = 'pointer';
+        updateAnomalyPopover(hit);
       } else {
-        const marginL = 56, marginR = 24, marginT = 28, marginB = 36;
-        const displayW = rect.width > 0 ? rect.width : 900;
-        const displayH = 420;
-        const plotW = Math.max(10, displayW - marginL - marginR);
-        const plotH = Math.max(10, displayH - marginT - marginB);
-
-        let { xMin, xMax, yMin, yMax, points } = lastPlotData;
-        if (xMin >= xMax) { xMin = -10; xMax = 10; }
-        if (yMin >= yMax || !Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1.5; yMax = 1.5; }
-
-        const toPx = (x) => marginL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
-        const toPy = (y) => marginT + plotH - ((y - yMin) / (yMax - yMin || 1)) * plotH;
-        const toMathX = (px) => xMin + ((px - marginL) / plotW) * (xMax - xMin);
-
-        const curveData = getDistanceToCurve(hoverCoord.x, hoverCoord.y, points, toPx, toPy, toMathX);
-        if (curveData.point && curveData.distance <= 24) {
-          canvas.style.cursor = 'pointer';
+        updateAnomalyPopover(null);
+        if (isLockedToPlot) {
+          canvas.style.cursor = 'ew-resize';
         } else {
-          canvas.style.cursor = 'crosshair';
+          const curveData = getDistanceToCurve(hoverCoord.x, hoverCoord.y, points, toPx, toPy, toMathX);
+          if (curveData.point && curveData.distance <= 24) {
+            canvas.style.cursor = 'pointer';
+          } else {
+            canvas.style.cursor = 'crosshair';
+          }
         }
       }
 
@@ -684,12 +1029,11 @@ export function initGraphView() {
 
     canvas.addEventListener('mouseleave', () => {
       hoverCoord = null;
+      activeAnomalyHit = null;
+      updateAnomalyPopover(null);
       renderCanvas();
     });
 
-    // Single Click:
-    // - Click ON plot line (within 24px) -> Lock strictly to curve
-    // - Click AWAY from plot line -> Unlock / return to free roam
     canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -701,13 +1045,20 @@ export function initGraphView() {
       const plotW = Math.max(10, displayW - marginL - marginR);
       const plotH = Math.max(10, displayH - marginT - marginB);
 
-      let { xMin, xMax, yMin, yMax, points } = lastPlotData;
+      let { xMin, xMax, yMin, yMax, points, anomalies } = lastPlotData;
       if (xMin >= xMax) { xMin = -10; xMax = 10; }
       if (yMin >= yMax || !Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1.5; yMax = 1.5; }
 
       const toPx = (x) => marginL + ((x - xMin) / (xMax - xMin || 1)) * plotW;
       const toPy = (y) => marginT + plotH - ((y - yMin) / (yMax - yMin || 1)) * plotH;
       const toMathX = (px) => xMin + ((px - marginL) / plotW) * (xMax - xMin);
+
+      const hit = checkAnomalyHit(clickX, clickY, anomalies, points, toPx, toPy, marginT, marginB, plotH);
+      if (hit) {
+        activeAnomalyHit = hit;
+        updateAnomalyPopover(hit);
+        return;
+      }
 
       const curveData = getDistanceToCurve(clickX, clickY, points, toPx, toPy, toMathX);
       if (curveData.point && curveData.distance <= 24) {
@@ -720,7 +1071,6 @@ export function initGraphView() {
       renderCanvas();
     });
 
-    // Double Click: Always unlock to free roam mode
     canvas.addEventListener('dblclick', (e) => {
       e.preventDefault();
       isLockedToPlot = false;
@@ -740,6 +1090,5 @@ export function initGraphView() {
     renderCanvas();
   });
 
-  // Initial plot on load
   plot();
 }

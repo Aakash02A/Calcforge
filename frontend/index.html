@@ -324,8 +324,9 @@
             <button class="btn btn-sm btn-cf-accent w-100" id="graph-plot-btn">Plot</button>
           </div>
         </div>
-        <div class="cf-graph-canvas-wrap">
+        <div class="cf-graph-canvas-wrap position-relative">
           <canvas id="graph-canvas" width="900" height="420" style="width:100%; height:420px;"></canvas>
+          <div id="graph-anomaly-popover" class="cf-anomaly-popover d-none"></div>
         </div>
         <p class="cf-faint small mt-2" id="graph-status">Graphing uses your workspace's saved variables for anything besides the swept variable.</p>
       </section>

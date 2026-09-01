@@ -594,6 +594,91 @@ input.form-control:focus, select.form-select:focus, textarea.form-control:focus 
   cursor: crosshair;
 }
 
+.cf-anomaly-popover {
+  position: absolute;
+  z-index: 60;
+  pointer-events: none;
+  background: rgba(18, 22, 30, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ffffff;
+  max-width: 380px;
+  min-width: 250px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6), 0 0 16px rgba(239, 68, 68, 0.35);
+  border: 1.5px solid #ef4444;
+  transition: opacity 0.12s cubic-bezier(0.16, 1, 0.3, 1), transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(0);
+}
+
+.cf-anomaly-popover.popover-asymptote {
+  border-color: #ef4444;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6), 0 0 16px rgba(239, 68, 68, 0.35);
+}
+
+.cf-anomaly-popover.popover-hole {
+  border-color: #f43f5e;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6), 0 0 16px rgba(244, 63, 94, 0.35);
+}
+
+.cf-anomaly-popover.popover-precision {
+  border-color: #f59e0b;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+.cf-anomaly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.cf-anomaly-badge.badge-asymptote {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.cf-anomaly-badge.badge-hole {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.5);
+}
+
+.cf-anomaly-badge.badge-precision {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.cf-anomaly-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.cf-anomaly-explanation {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.cf-anomaly-detail {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
 @media (max-width: 640px) {
   .cf-sidebar { width: 64px; }
   .cf-nav-btn { width: 48px; }

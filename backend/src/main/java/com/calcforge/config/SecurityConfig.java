@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/local/**").permitAll()
+                        .requestMatchers("/api/graph/**").permitAll()
                         .requestMatchers("/api/v1/cloud/auth/**").permitAll()
                         .requestMatchers("/api/v1/cloud/feature-flags").permitAll()
                         .requestMatchers("/api/v1/cloud/shared/**").permitAll()
