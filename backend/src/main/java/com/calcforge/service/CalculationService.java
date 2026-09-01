@@ -69,11 +69,16 @@ public class CalculationService {
             historyId = saveHistory(request.expression(), outcome.getResult(), trail, request.tags(), null, request.workspaceId());
         }
 
+        String resultDisplay = NumberFormatter.display(outcome.getResult());
+        if (outcome.getDimension() != null && !outcome.getDimension().isDimensionless()) {
+            resultDisplay += " [" + outcome.getDimension().toDerivedString() + "]";
+        }
+
         return new CalculationResponse(
                 request.expression(),
                 outcome.getResult(),
                 NumberFormatter.plain(outcome.getResult()),
-                NumberFormatter.display(outcome.getResult()),
+                resultDisplay,
                 angleMode.name(),
                 precision,
                 trail,
@@ -88,8 +93,8 @@ public class CalculationService {
         if (variables != null) {
             ctx.setVariables(variables);
         }
-        BigDecimal result = Evaluator.evaluate(ast, ctx);
-        return new EvaluationOutcome(ast, result, ctx);
+        com.calcforge.engine.unit.PhysicalValue physical = Evaluator.evaluatePhysical(ast, ctx);
+        return new EvaluationOutcome(ast, physical.getValue(), physical.getDimension(), ctx);
     }
 
     /** Merges a workspace's saved variables (if any) with inline overrides, overrides taking precedence. */
@@ -137,15 +142,22 @@ public class CalculationService {
 
         List<TrailStep> computationSteps = ctx.getTrail();
         if (computationSteps.isEmpty()) {
-            steps.add(new TrailStepDto("COMPUTATION", "Direct value", rawInput,
-                    NumberFormatter.plain(result), "No further reduction needed"));
+            String directVal = NumberFormatter.plain(result);
+            if (outcome.getDimension() != null && !outcome.getDimension().isDimensionless()) {
+                directVal += " [" + outcome.getDimension().toDerivedString() + "]";
+            }
+            steps.add(new TrailStepDto("COMPUTATION", "Direct value", rawInput, directVal, "No further reduction needed"));
         } else {
             for (TrailStep s : computationSteps) {
                 steps.add(new TrailStepDto(s.getStage().name(), s.getTitle(), s.getExpression(), s.getValue(), s.getNote()));
             }
         }
 
-        steps.add(new TrailStepDto("RESULT", "Result", null, NumberFormatter.display(result), null));
+        String resultStr = NumberFormatter.display(result);
+        if (outcome.getDimension() != null && !outcome.getDimension().isDimensionless()) {
+            resultStr += " [" + outcome.getDimension().toDerivedString() + "]";
+        }
+        steps.add(new TrailStepDto("RESULT", "Result", null, resultStr, null));
 
         return new CalculationTrailDto(steps);
     }

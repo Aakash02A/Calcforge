@@ -119,6 +119,29 @@ export function formatDate(iso) {
   }
 }
 
+export function formatUnitHtml(unitStr) {
+  if (!unitStr) return '';
+  let clean = String(unitStr).trim();
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (!clean || clean === '1' || clean.toLowerCase() === 'dimensionless') return '';
+
+  const formatUnitPart = (part) => {
+    return escapeHtml(part)
+      .replace(/\^([-\d]+)/g, '<sup>$1</sup>')
+      .replace(/\*|\u00B7/g, '·');
+  };
+
+  const slashIdx = clean.indexOf('/');
+  if (slashIdx !== -1) {
+    const num = clean.slice(0, slashIdx).trim();
+    const den = clean.slice(slashIdx + 1).trim();
+    return `<span class="cf-unit-frac"><span class="cf-unit-num">${formatUnitPart(num)}</span><span class="cf-unit-slash">/</span><span class="cf-unit-den">${formatUnitPart(den)}</span></span>`;
+  }
+  return `<span class="cf-unit">${formatUnitPart(clean)}</span>`;
+}
+
 const STAGE_LABELS = {
   INPUT: 'Input',
   ASSUMPTIONS: 'Assumptions',
@@ -145,7 +168,16 @@ export function renderTrail(container, trail) {
     html += `<div class="cf-ledger-step ${isResult ? 'result' : ''}">`;
     if (s.title) html += `<span class="cf-step-title">${escapeHtml(s.title)}</span>`;
     if (s.expression) html += `<span class="cf-step-expr">${escapeHtml(s.expression)}</span>`;
-    if (s.value) html += `<span class="cf-step-value">${isResult ? '' : '= '}${escapeHtml(s.value)}</span>`;
+
+    if (s.value) {
+      const unit = s.unit || s.unit_dimension_string || s.unitDimension;
+      let unitHtml = '';
+      if (unit) {
+        unitHtml = ` <span class="cf-unit-badge">${formatUnitHtml(unit)}</span>`;
+      }
+      html += `<span class="cf-step-value">${isResult ? '' : '= '}${escapeHtml(s.value)}${unitHtml}</span>`;
+    }
+
     if (s.note) html += `<span class="cf-faint" style="flex-basis:100%; font-size:.72rem;">${escapeHtml(s.note)}</span>`;
     html += `</div>`;
   }

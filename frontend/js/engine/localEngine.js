@@ -56,7 +56,29 @@ function tokenize(source) {
           while (i < source.length && isDigit(source[i])) i++;
         }
       }
-      tokens.push({ type: 'NUMBER', text: source.slice(start, i) });
+      const numStr = source.slice(start, i);
+
+      if (i < source.length && source[i] === '[') {
+        const unitStart = i + 1;
+        const closeIdx = source.indexOf(']', unitStart);
+        if (closeIdx === -1) {
+          throw new EngineError('SYNTAX_ERROR', `Unclosed unit bracket at position ${i}`);
+        }
+        const unitStr = source.slice(unitStart, closeIdx).trim();
+        if (unitStr.length === 0) {
+          throw new EngineError('SYNTAX_ERROR', `Empty unit brackets at position ${i}`);
+        }
+        tokens.push({
+          type: 'NUMBER_WITH_UNIT',
+          text: source.slice(start, closeIdx + 1),
+          value: numStr,
+          unit: unitStr,
+        });
+        i = closeIdx + 1;
+        continue;
+      }
+
+      tokens.push({ type: 'NUMBER', text: numStr, value: numStr });
       continue;
     }
 
@@ -69,7 +91,7 @@ function tokenize(source) {
 
     const single = { '+': 'PLUS', '-': 'MINUS', '\u2212': 'MINUS', '*': 'STAR', '\u00D7': 'STAR',
       '/': 'SLASH', '\u00F7': 'SLASH', '%': 'PERCENT', '^': 'CARET', '!': 'BANG',
-      '(': 'LPAREN', ')': 'RPAREN', ',': 'COMMA' };
+      '(': 'LPAREN', ')': 'RPAREN', ',': 'COMMA', '=': 'EQUALS' };
     if (single[c]) { tokens.push({ type: single[c], text: c }); i++; continue; }
 
     throw new EngineError('SYNTAX_ERROR', `Unexpected character '${c}' at position ${i}`);
@@ -114,7 +136,7 @@ function expression(ts) {
 }
 
 function startsImplicitFactor(ts) {
-  return ts.check('NUMBER') || ts.check('IDENTIFIER') || ts.check('LPAREN');
+  return ts.check('NUMBER') || ts.check('NUMBER_WITH_UNIT') || ts.check('IDENTIFIER') || ts.check('LPAREN');
 }
 
 function term(ts) {
@@ -153,6 +175,12 @@ function postfix(ts) {
 }
 
 function primary(ts) {
+  if (ts.check('NUMBER_WITH_UNIT')) {
+    const t = ts.advance();
+    const value = Number(t.value);
+    if (!Number.isFinite(value)) throw new EngineError('SYNTAX_ERROR', `Malformed number '${t.value}'`);
+    return { type: 'NumberWithUnit', value, unit: t.unit };
+  }
   if (ts.check('NUMBER')) {
     const t = ts.advance();
     const value = Number(t.text);

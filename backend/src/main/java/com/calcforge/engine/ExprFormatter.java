@@ -21,6 +21,9 @@ public final class ExprFormatter {
     }
 
     public static String format(Expr expr) {
+        if (expr instanceof com.calcforge.engine.ast.PhysicalValueExpr e) {
+            return NumberFormatter.plain(e.getPhysicalValue().getValue()) + "[" + e.getPhysicalValue().getDimension().toDerivedString() + "]";
+        }
         if (expr instanceof NumberExpr e) {
             return NumberFormatter.plain(e.getValue());
         }

@@ -25,7 +25,9 @@ public class ExpressionException extends RuntimeException {
         DOMAIN_ERROR,
         OVERFLOW,
         LIMIT_EXCEEDED,
-        EMPTY_EXPRESSION
+        EMPTY_EXPRESSION,
+        DIMENSIONAL_MISMATCH,
+        INVALID_OPERAND
     }
 
     private final ErrorCode errorCode;

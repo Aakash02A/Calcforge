@@ -136,6 +136,16 @@ public class Lexer {
             }
         }
 
+        if (!isAtEnd() && peek() == '[') {
+            int closeBracket = source.indexOf(']', pos);
+            if (closeBracket == -1) {
+                throw new ExpressionException(ErrorCode.SYNTAX_ERROR,
+                        "Unclosed unit bracket '[' at position " + pos);
+            }
+            pos = closeBracket + 1;
+            return new Token(TokenType.NUMBER_WITH_UNIT, source.substring(start, pos), start);
+        }
+
         return new Token(TokenType.NUMBER, source.substring(start, pos), start);
     }
 

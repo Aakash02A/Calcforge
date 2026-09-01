@@ -24,6 +24,23 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(DimensionalMismatchException.class)
+    public ResponseEntity<DimensionalErrorResponse> handleDimensionalMismatch(
+            DimensionalMismatchException ex, HttpServletRequest req) {
+        DimensionalErrorResponse body = new DimensionalErrorResponse(
+                Instant.now(),
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+                "DIMENSIONAL_MISMATCH",
+                ex.getMessage(),
+                req.getRequestURI(),
+                ex.getOperation(),
+                ex.getLeftDimension(),
+                ex.getRightDimension()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+
     @ExceptionHandler(ExpressionException.class)
     public ResponseEntity<ApiError> handleExpressionException(ExpressionException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, ex.getErrorCode().name(), ex.getMessage(), req, null);

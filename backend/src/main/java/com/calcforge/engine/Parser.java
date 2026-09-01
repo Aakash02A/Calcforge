@@ -91,7 +91,7 @@ public class Parser {
     }
 
     private boolean startsImplicitFactor() {
-        return check(TokenType.NUMBER) || check(TokenType.IDENTIFIER) || check(TokenType.LPAREN);
+        return check(TokenType.NUMBER) || check(TokenType.NUMBER_WITH_UNIT) || check(TokenType.IDENTIFIER) || check(TokenType.LPAREN);
     }
 
     // unary := ('+' | '-') unary | power
@@ -132,6 +132,26 @@ public class Parser {
     }
 
     private Expr primary() {
+        if (check(TokenType.NUMBER_WITH_UNIT)) {
+            Token t = advance();
+            String text = t.getText();
+            int bracketStart = text.indexOf('[');
+            int bracketEnd = text.indexOf(']', bracketStart);
+            String numPart = text.substring(0, bracketStart).trim();
+            String unitPart = text.substring(bracketStart + 1, bracketEnd).trim();
+            try {
+                BigDecimal num = new BigDecimal(numPart);
+                com.calcforge.engine.unit.UnitDimension dim = com.calcforge.engine.unit.UnitParser.parse(unitPart);
+                return new com.calcforge.engine.ast.PhysicalValueExpr(new com.calcforge.engine.unit.PhysicalValue(num, dim));
+            } catch (NumberFormatException e) {
+                throw new ExpressionException(ErrorCode.SYNTAX_ERROR,
+                        "Malformed number '" + numPart + "'");
+            } catch (IllegalArgumentException e) {
+                throw new ExpressionException(ErrorCode.SYNTAX_ERROR,
+                        "Invalid unit signature: " + e.getMessage());
+            }
+        }
+
         if (check(TokenType.NUMBER)) {
             Token t = advance();
             try {

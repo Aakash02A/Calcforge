@@ -7,110 +7,147 @@ import com.calcforge.engine.ast.FactorialExpr;
 import com.calcforge.engine.ast.FunctionCallExpr;
 import com.calcforge.engine.ast.NumberExpr;
 import com.calcforge.engine.ast.PercentExpr;
+import com.calcforge.engine.ast.PhysicalValueExpr;
 import com.calcforge.engine.ast.UnaryExpr;
 import com.calcforge.engine.ast.VariableExpr;
+import com.calcforge.engine.unit.PhysicalValue;
+import com.calcforge.engine.unit.UnitDimension;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Walks a parsed {@link Expr} tree bottom-up, computing a {@link BigDecimal} result and
- * appending one {@link TrailStep} (stage {@link TrailStage#COMPUTATION}) to the
- * {@link EvaluationContext} for every real operation performed (not for bare literals or
- * variable references, which aren't "operations"). Steps are recorded in evaluation order
- * (innermost/leftmost first), which is both the true order of computation and, for the
- * vast majority of everyday expressions, the order a person would reduce them by hand.
- */
 public final class Evaluator {
 
     private Evaluator() {
     }
 
     public static BigDecimal evaluate(Expr expr, EvaluationContext ctx) {
-        return eval(expr, ctx);
+        return evalPhysical(expr, ctx).getValue();
     }
 
-    private static BigDecimal eval(Expr expr, EvaluationContext ctx) {
+    public static PhysicalValue evaluatePhysical(Expr expr, EvaluationContext ctx) {
+        return evalPhysical(expr, ctx);
+    }
+
+    private static PhysicalValue evalPhysical(Expr expr, EvaluationContext ctx) {
+        if (expr instanceof PhysicalValueExpr e) {
+            return e.getPhysicalValue();
+        }
         if (expr instanceof NumberExpr e) {
-            return e.getValue();
+            return PhysicalValue.dimensionless(e.getValue());
         }
         if (expr instanceof VariableExpr e) {
-            return resolveVariable(e.getName(), ctx);
+            return PhysicalValue.dimensionless(resolveVariable(e.getName(), ctx));
         }
         if (expr instanceof UnaryExpr e) {
-            BigDecimal operand = eval(e.getOperand(), ctx);
-            BigDecimal result = "-".equals(e.getOperator()) ? operand.negate() : operand;
+            PhysicalValue operand = evalPhysical(e.getOperand(), ctx);
+            BigDecimal val = "-".equals(e.getOperator()) ? operand.getValue().negate() : operand.getValue();
+            PhysicalValue result = new PhysicalValue(val, operand.getDimension());
             recordStep(ctx, "-".equals(e.getOperator()) ? "Negate" : "Unary plus",
-                    e.getOperator() + "(" + NumberFormatter.plain(operand) + ")", result);
+                    e.getOperator() + "(" + formatPhysical(operand) + ")", result);
             return result;
         }
         if (expr instanceof PercentExpr e) {
-            BigDecimal operand = eval(e.getOperand(), ctx);
-            BigDecimal result = operand.divide(BigDecimal.valueOf(100), ctx.getMathContext());
-            recordStep(ctx, "Percent (\u00f7 100)", NumberFormatter.plain(operand) + "%", result);
+            PhysicalValue operand = evalPhysical(e.getOperand(), ctx);
+            BigDecimal val = operand.getValue().divide(BigDecimal.valueOf(100), ctx.getMathContext());
+            PhysicalValue result = new PhysicalValue(val, operand.getDimension());
+            recordStep(ctx, "Percent (\u00f7 100)", formatPhysical(operand) + "%", result);
             return result;
         }
         if (expr instanceof FactorialExpr e) {
-            BigDecimal operand = eval(e.getOperand(), ctx);
-            BigDecimal result = MathFunctions.factorial(operand);
-            recordStep(ctx, "Factorial", NumberFormatter.plain(operand) + "!", result);
+            PhysicalValue operand = evalPhysical(e.getOperand(), ctx);
+            if (!operand.getDimension().isDimensionless()) {
+                throw new ExpressionException(ErrorCode.INVALID_OPERAND, "Factorial cannot be applied to unit dimensioned values");
+            }
+            BigDecimal val = MathFunctions.factorial(operand.getValue());
+            PhysicalValue result = PhysicalValue.dimensionless(val);
+            recordStep(ctx, "Factorial", NumberFormatter.plain(operand.getValue()) + "!", result);
             return result;
         }
         if (expr instanceof FunctionCallExpr e) {
-            List<BigDecimal> args = new ArrayList<>();
+            List<PhysicalValue> args = new ArrayList<>();
             for (Expr a : e.getArgs()) {
-                args.add(eval(a, ctx));
+                args.add(evalPhysical(a, ctx));
             }
+            List<BigDecimal> rawArgs = args.stream().map(PhysicalValue::getValue).toList();
             if (MathFunctions.isKnownFunction(e.getName())) {
-                BigDecimal result = MathFunctions.apply(e.getName(), args, ctx);
+                BigDecimal val = MathFunctions.apply(e.getName(), rawArgs, ctx);
+                PhysicalValue result = PhysicalValue.dimensionless(val);
                 String rendered = e.getName() + "(" +
-                        args.stream().map(NumberFormatter::plain).collect(Collectors.joining(", ")) + ")";
+                        args.stream().map(Evaluator::formatPhysical).collect(Collectors.joining(", ")) + ")";
                 recordStep(ctx, "Apply " + e.getName() + "()", rendered, result);
                 return result;
             }
-            // Fallback for implicit multiplication when using a variable/constant name as a function:
-            // e.g. x(2+3) -> x * (2+3)
             if (args.size() == 1) {
                 String name = e.getName();
                 boolean isVar = ctx.lookupVariable(name) != null;
                 boolean isConst = MathConstants.resolve(name, ctx.getMathContext()) != null;
                 if (isVar || isConst) {
                     BigDecimal varValue = resolveVariable(name, ctx);
-                    BigDecimal result = varValue.multiply(args.get(0), ctx.getMathContext());
-                    recordStep(ctx, "Multiply (implicit)", name + "(" + NumberFormatter.plain(args.get(0)) + ")", result);
+                    BigDecimal val = varValue.multiply(args.get(0).getValue(), ctx.getMathContext());
+                    PhysicalValue result = new PhysicalValue(val, args.get(0).getDimension());
+                    recordStep(ctx, "Multiply (implicit)", name + "(" + formatPhysical(args.get(0)) + ")", result);
                     return result;
                 }
             }
             throw new ExpressionException(ErrorCode.UNKNOWN_FUNCTION, "Unknown function '" + e.getName() + "'");
         }
         if (expr instanceof BinaryExpr e) {
-            BigDecimal left = eval(e.getLeft(), ctx);
-            BigDecimal right = eval(e.getRight(), ctx);
-            BigDecimal result = applyBinary(e.getOperator(), left, right, ctx);
-            String rendered = NumberFormatter.plain(left) + " " + e.getOperator() + " " + NumberFormatter.plain(right);
+            PhysicalValue left = evalPhysical(e.getLeft(), ctx);
+            PhysicalValue right = evalPhysical(e.getRight(), ctx);
+            PhysicalValue result = applyBinaryPhysical(e.getOperator(), left, right, ctx);
+            String rendered = formatPhysical(left) + " " + e.getOperator() + " " + formatPhysical(right);
             recordStep(ctx, describeOperator(e.getOperator()), rendered, result);
             return result;
         }
         throw new IllegalStateException("Unhandled AST node: " + expr.getClass());
     }
 
-    private static BigDecimal applyBinary(String op, BigDecimal left, BigDecimal right, EvaluationContext ctx) {
+    private static PhysicalValue applyBinaryPhysical(String op, PhysicalValue left, PhysicalValue right, EvaluationContext ctx) {
         return switch (op) {
-            case "+" -> left.add(right, ctx.getMathContext());
-            case "-" -> left.subtract(right, ctx.getMathContext());
-            case "*" -> left.multiply(right, ctx.getMathContext());
-            case "/" -> {
-                if (right.signum() == 0) {
-                    throw new ExpressionException(ErrorCode.DIVISION_BY_ZERO,
-                            "Division by zero (" + NumberFormatter.plain(left) + " / 0)");
+            case "+" -> {
+                if (!left.getDimension().equals(right.getDimension())) {
+                    throw new ExpressionException(ErrorCode.INVALID_OPERAND,
+                            "Dimensional mismatch in addition: " + left.getDimension().toDerivedString() + " vs " + right.getDimension().toDerivedString());
                 }
-                yield left.divide(right, ctx.getMathContext());
+                yield new PhysicalValue(left.getValue().add(right.getValue(), ctx.getMathContext()), left.getDimension());
             }
-            case "^" -> MathFunctions.power(left, right, ctx.getMathContext());
+            case "-" -> {
+                if (!left.getDimension().equals(right.getDimension())) {
+                    throw new ExpressionException(ErrorCode.INVALID_OPERAND,
+                            "Dimensional mismatch in subtraction: " + left.getDimension().toDerivedString() + " vs " + right.getDimension().toDerivedString());
+                }
+                yield new PhysicalValue(left.getValue().subtract(right.getValue(), ctx.getMathContext()), left.getDimension());
+            }
+            case "*" -> new PhysicalValue(left.getValue().multiply(right.getValue(), ctx.getMathContext()),
+                    left.getDimension().multiply(right.getDimension()));
+            case "/" -> {
+                if (right.getValue().signum() == 0) {
+                    throw new ExpressionException(ErrorCode.DIVISION_BY_ZERO,
+                            "Division by zero (" + formatPhysical(left) + " / 0)");
+                }
+                yield new PhysicalValue(left.getValue().divide(right.getValue(), ctx.getMathContext()),
+                        left.getDimension().divide(right.getDimension()));
+            }
+            case "^" -> {
+                if (!right.getDimension().isDimensionless()) {
+                    throw new ExpressionException(ErrorCode.INVALID_OPERAND, "Exponent must be dimensionless");
+                }
+                int expInt = right.getValue().intValueExact();
+                BigDecimal val = MathFunctions.power(left.getValue(), right.getValue(), ctx.getMathContext());
+                yield new PhysicalValue(val, left.getDimension().pow(expInt));
+            }
             default -> throw new IllegalStateException("Unknown operator: " + op);
         };
+    }
+
+    private static String formatPhysical(PhysicalValue pv) {
+        if (pv.getDimension().isDimensionless()) {
+            return NumberFormatter.plain(pv.getValue());
+        }
+        return NumberFormatter.plain(pv.getValue()) + "[" + pv.getDimension().toDerivedString() + "]";
     }
 
     private static String describeOperator(String op) {
@@ -137,12 +174,12 @@ public final class Evaluator {
         return value;
     }
 
-    private static void recordStep(EvaluationContext ctx, String title, String expression, BigDecimal result) {
+    private static void recordStep(EvaluationContext ctx, String title, String expression, PhysicalValue result) {
         ctx.addTrailStep(TrailStep.builder()
                 .stage(TrailStage.COMPUTATION)
                 .title("Step " + ctx.nextComputationStepNumber() + ": " + title)
                 .expression(expression)
-                .value(NumberFormatter.plain(result))
+                .value(formatPhysical(result))
                 .build());
     }
 }

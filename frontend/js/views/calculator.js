@@ -86,19 +86,56 @@ function buildKeypad() {
   }
 }
 
+function clearBoardHighlight() {
+  const displayPanel = document.querySelector('.cf-display-panel');
+  if (displayPanel) {
+    displayPanel.classList.remove('border', 'border-danger', 'border-2');
+  }
+}
+
 function renderEmpty() {
+  clearBoardHighlight();
   resultDisplay().textContent = '\u00a0';
   resultDisplay().classList.remove('cf-result-error');
   trailLedger().innerHTML = '<p class="cf-ledger-empty">Enter an expression to see the input, assumptions, formula, computation and result laid out step by step.</p>';
 }
 
 function renderError(message) {
+  clearBoardHighlight();
   resultDisplay().textContent = message;
   resultDisplay().classList.add('cf-result-error');
   trailLedger().innerHTML = `<p class="cf-ledger-empty">${escapeHtml(message)}</p>`;
 }
 
+function renderDimensionalError(err) {
+  const displayPanel = document.querySelector('.cf-display-panel');
+  if (displayPanel) {
+    displayPanel.classList.add('border', 'border-danger', 'border-2');
+  }
+  resultDisplay().textContent = 'Dimension Error';
+  resultDisplay().classList.add('cf-result-error');
+
+  const op = err.operation ? ` (${escapeHtml(err.operation)})` : '';
+  const msg = err.message || 'Dimensional mismatch: operands have incompatible physical units.';
+
+  trailLedger().innerHTML = `
+    <div class="alert alert-danger d-flex flex-column gap-2 p-3 my-2" role="alert">
+      <div class="d-flex align-items-center gap-2">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="text-danger"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <strong>Dimensional Mismatch Exception${op}</strong>
+      </div>
+      <div class="small">${escapeHtml(msg)}</div>
+      ${err.leftDimension && err.rightDimension ? `
+        <div class="d-flex gap-3 small font-mono mt-1 text-muted">
+          <span>Left: <code>${escapeHtml(JSON.stringify(err.leftDimension))}</code></span>
+          <span>Right: <code>${escapeHtml(JSON.stringify(err.rightDimension))}</code></span>
+        </div>` : ''}
+    </div>
+  `;
+}
+
 function renderResult(displayValue, trail) {
+  clearBoardHighlight();
   resultDisplay().classList.remove('cf-result-error');
   resultDisplay().textContent = displayValue;
   renderTrail(trailLedger(), trail);
@@ -125,6 +162,9 @@ async function evaluateNow(expression, { save }) {
     } catch (err) {
       if (err.status === 0) {
         state.online = false; // fall through to offline engine below
+      } else if (err.errorCode === 'DIMENSIONAL_MISMATCH' || err.status === 422) {
+        renderDimensionalError(err);
+        return;
       } else {
         renderError(err.message);
         return;

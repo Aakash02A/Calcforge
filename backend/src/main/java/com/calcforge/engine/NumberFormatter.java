@@ -17,7 +17,12 @@ public final class NumberFormatter {
 
     /** Display representation: plain for "normal magnitude" numbers, scientific for very large/small ones. */
     public static String display(BigDecimal value) {
-        String s = value.stripTrailingZeros().toString();
+        BigDecimal stripped = value.stripTrailingZeros();
+        if (stripped.scale() < 0 && stripped.scale() > -7) {
+            String s = stripped.toPlainString();
+            return "-0".equals(s) ? "0" : s;
+        }
+        String s = stripped.toString();
         return "-0".equals(s) ? "0" : s;
     }
 
